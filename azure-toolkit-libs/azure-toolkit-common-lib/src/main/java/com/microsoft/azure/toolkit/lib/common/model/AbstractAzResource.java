@@ -95,7 +95,7 @@ public abstract class AbstractAzResource<T extends AbstractAzResource<T, P, R>, 
         final P parent = this.getParent();
         if (StringUtils.equals(this.status.get(), Status.DELETED)) {
             return false;
-        } else if (parent.equals(AzResource.NONE) || this instanceof AbstractAzServiceSubscription || this instanceof ResourceGroup) {
+        } else if (this.isMocked() || parent.equals(AzResource.NONE) || this instanceof AbstractAzServiceSubscription || this instanceof ResourceGroup) {
             return this.remoteOptional().isPresent();
         } else {
             final ResourceGroup rg = this.getResourceGroup();
@@ -300,13 +300,11 @@ public abstract class AbstractAzResource<T extends AbstractAzResource<T, P, R>, 
     public ResourceGroup getResourceGroup() {
         final String rgName = this.getResourceGroupName();
         final String sid = this.getSubscriptionId();
-        final boolean isSubscriptionSet = StringUtils.isNotBlank(sid) &&
-            Character.isLetterOrDigit(sid.trim().charAt(0))&&
+        final boolean isSubscriptionSet = StringUtils.isNotBlank(sid) && !this.isMocked() &&
             !StringUtils.equalsAnyIgnoreCase(sid, "<none>", NONE.getName());
-        final boolean isResourceGroupSet = StringUtils.isNotBlank(rgName) &&
-            !rgName.trim().startsWith("<")&&
+        final boolean isResourceGroupSet = isSubscriptionSet && StringUtils.isNotBlank(rgName) &&
             !StringUtils.equalsAnyIgnoreCase(rgName, "<none>", NONE.getName(), RESOURCE_GROUP_PLACEHOLDER);
-        if (!isResourceGroupSet || !isSubscriptionSet) {
+        if (!isResourceGroupSet) {
             return null;
         }
         return Azure.az(AzureResources.class).groups(this.getSubscriptionId()).get(rgName, rgName);
@@ -333,7 +331,7 @@ public abstract class AbstractAzResource<T extends AbstractAzResource<T, P, R>, 
     }
 
     public boolean isAuthRequired() {
-        return Character.isLetterOrDigit(this.getSubscriptionId().trim().charAt(0));
+        return !this.isMocked();
     }
 
     public static boolean is404(Throwable t) {
@@ -358,5 +356,10 @@ public abstract class AbstractAzResource<T extends AbstractAzResource<T, P, R>, 
             .map(HttpResponseException::getResponse)
             .filter(predicate)
             .isPresent();
+    }
+
+    public boolean isMocked() {
+        final String subscriptionId = this.getSubscriptionId();
+        return Subscription.MOCK_SUBSCRIPTION_ID.equals(subscriptionId) || !Character.isLetterOrDigit(subscriptionId.trim().charAt(0));
     }
 }
