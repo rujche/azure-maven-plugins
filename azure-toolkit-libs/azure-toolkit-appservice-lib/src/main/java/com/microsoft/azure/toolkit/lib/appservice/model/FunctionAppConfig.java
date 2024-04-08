@@ -118,6 +118,11 @@ public class FunctionAppConfig {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class FunctionTriggers {
+
+        public FunctionTriggers(@Nonnull Integer httpInstanceConcurrency) {
+            this.http = new FunctionHttpTriggers(httpInstanceConcurrency);
+        }
+
         // Scale and concurrency settings for the HTTP trigger.
         private FunctionHttpTriggers http;
     }

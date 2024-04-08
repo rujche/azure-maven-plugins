@@ -201,6 +201,11 @@ public class DeployMojo extends AbstractFunctionMojo {
     @Parameter(property = "alwaysReadyInstances")
     protected Map<String, String> alwaysReadyInstances;
 
+    @JsonProperty
+    @Getter
+    @Parameter(property = "httpInstanceConcurrency")
+    protected Integer httpInstanceConcurrency;
+
     @Override
     @AzureOperation("user/functionapp.deploy_app")
     protected void doExecute() throws Throwable {

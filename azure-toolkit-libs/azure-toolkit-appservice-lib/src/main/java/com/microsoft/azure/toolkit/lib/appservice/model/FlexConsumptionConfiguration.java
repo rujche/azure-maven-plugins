@@ -53,6 +53,7 @@ public class FlexConsumptionConfiguration {
     private String storageAccountConnectionString;
     // scale configuration
     private Integer instanceSize;
+    private Integer httpInstanceConcurrency;
     private Map<String, String> alwaysReadyInstances;
     private Integer maximumInstances;
 
@@ -95,6 +96,9 @@ public class FlexConsumptionConfiguration {
         final FunctionAppConfig.FunctionScaleAndConcurrency scale = config.getScaleAndConcurrency();
         builder.instanceSize(scale.getInstanceMemoryMB());
         builder.maximumInstances(scale.getMaximumInstanceCount());
+        final Integer httpInstanceConcurrency = Optional.ofNullable(scale.getTriggers()).map(FunctionAppConfig.FunctionTriggers::getHttp)
+            .map(FunctionAppConfig.FunctionHttpTriggers::getPerInstanceConcurrency).orElse(null);
+        builder.httpInstanceConcurrency(httpInstanceConcurrency);
         final Map<String, String> alwaysReady = new HashMap<>();
         if (ArrayUtils.isNotEmpty(scale.getAlwaysReady())) {
             Arrays.stream(scale.getAlwaysReady()).forEach(c -> alwaysReady.put(c.getName(), String.valueOf(c.getInstanceCount())));

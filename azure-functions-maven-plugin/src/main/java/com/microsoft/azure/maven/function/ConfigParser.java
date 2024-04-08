@@ -64,6 +64,7 @@ public class ConfigParser {
         return FlexConsumptionConfiguration.builder()
             .alwaysReadyInstances(mojo.getAlwaysReadyInstances())
             .instanceSize(mojo.getInstanceSize())
+            .httpInstanceConcurrency(mojo.getHttpInstanceConcurrency())
             .maximumInstances(mojo.getMaximumInstances())
             .deploymentAccount(mojo.getDeploymentStorageAccount())
             .deploymentResourceGroup(mojo.getDeploymentStorageResourceGroup())
