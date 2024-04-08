@@ -38,9 +38,11 @@ import org.apache.commons.lang3.StringUtils;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -272,8 +274,10 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         @Nullable
         private ContainerRegistry containerRegistry;
         @Nonnull
-        @Builder.Default
         private List<EnvironmentVar> environmentVariables = new ArrayList<>();
+        @Nullable
+        private File source;
+        private Map<String, String> sourceBuildEnv;
 
         public ImageConfig(@Nonnull String fullImageName) {
             this.fullImageName = fullImageName;
