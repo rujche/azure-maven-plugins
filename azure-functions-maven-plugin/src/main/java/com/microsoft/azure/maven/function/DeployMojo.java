@@ -90,11 +90,13 @@ public class DeployMojo extends AbstractFunctionMojo {
             "please refer to https://aka.ms/maven_function_configuration#supported-regions for valid values";
     private static final String EXPANDABLE_JAVA_VERSION_WARNING = "'%s' may not be a valid java version, recommended values are `Java 8`, `Java 11` and `Java 17`";
     private static final String CV2_INVALID_CONTAINER_SIZE = "Invalid container size for flex consumption plan, valid values are: %s";
-    private static final String CV2_INVALID_MAX_INSTANCE = "Invalid maximum instances for flex consumption plan, the limit is 1000";
     public static final int MAX_MAX_INSTANCES = 1000;
-    public static final Set<Region> FLEX_CONSUMPTION_REGIONS = Collections.unmodifiableSet(Sets.newHashSet(Region.AUSTRALIA_EAST, Region.US_CENTRAL, Region.ASIA_EAST,
-        Region.US_EAST, Region.US_EAST2, Region.US_EAST2_EUAP, Region.EUROPE_NORTH, Region.US_SOUTH_CENTRAL, Region.ASIA_SOUTHEAST, Region.EUROPE_SWEDEN_CENTRAL,
-        Region.UK_SOUTH, Region.US_WEST2, Region.US_WEST3));
+    public static final int MIN_MAX_INSTANCES = 40;
+    public static final Set<Region> FLEX_CONSUMPTION_REGIONS = Collections.unmodifiableSet(Sets.newHashSet(Region.AUSTRALIA_EAST, Region.ASIA_EAST,
+        Region.US_EAST, Region.US_EAST2, Region.US_EAST2_EUAP, Region.EUROPE_NORTH, Region.US_SOUTH_CENTRAL, Region.UK_SOUTH, Region.ASIA_SOUTHEAST, Region.EUROPE_SWEDEN_CENTRAL,
+        Region.US_WEST2, Region.US_WEST3));
+    public static final int MIN_HTTP_INSTANCE_CONCURRENCY = 1;
+    public static final int MAX_HTTP_INSTANCE_CONCURRENCY = 1000;
 
     @Getter
     protected final ConfigParser parser = new ConfigParser(this);
@@ -253,30 +255,31 @@ public class DeployMojo extends AbstractFunctionMojo {
         // regions
         final Region region = Optional.ofNullable(getRegion()).filter(StringUtils::isNotBlank).map(Region::fromName).orElse(null);
         final String supportedRegions = FLEX_CONSUMPTION_REGIONS.stream().map(Region::getName).collect(Collectors.joining(", "));
-        if (Objects.isNull(region)) {
-            throw new AzureToolkitRuntimeException("Region is required for flex consumption function app, supported regions are %s", supportedRegions);
-        } else if (!FLEX_CONSUMPTION_REGIONS.contains(region)) {
+        if (Objects.nonNull(region) && !FLEX_CONSUMPTION_REGIONS.contains(region)) {
             throw new AzureToolkitRuntimeException("`%s` is not a valid region for flex consumption app, supported values are %s", region.getName(), supportedRegions);
         }
         // runtime
         final RuntimeConfiguration runtimeConfiguration = this.getRuntimeConfiguration();
         final OperatingSystem os = Optional.ofNullable(runtimeConfiguration).map(RuntimeConfiguration::getOs).map(OperatingSystem::fromString).orElse(null);
-        if (os != OperatingSystem.LINUX) {
+        if (Objects.nonNull(os) && os != OperatingSystem.LINUX) {
             throw new AzureToolkitRuntimeException("Flex consumption plan only supports Linux runtime");
         }
         // java version
-        final String javaVersion = Optional.of(runtimeConfiguration).map(RuntimeConfiguration::getJavaVersion).orElse(null);
-        final int javaMajorVersion = Optional.ofNullable(javaVersion).map(FunctionAppLinuxRuntime::fromJavaVersionUserText)
-            .map(FunctionAppLinuxRuntime::getJavaMajorVersionNumber).orElse(0);
-        if (javaMajorVersion != 11 && javaMajorVersion != 17) {
+        final String javaVersion = Optional.ofNullable(runtimeConfiguration).map(RuntimeConfiguration::getJavaVersion).orElse(null);
+        final Integer javaMajorVersion = Optional.ofNullable(javaVersion).map(FunctionAppLinuxRuntime::fromJavaVersionUserText)
+            .map(FunctionAppLinuxRuntime::getJavaMajorVersionNumber).orElse(null);
+        if (Objects.nonNull(javaMajorVersion) && javaMajorVersion != 11 && javaMajorVersion != 17) {
             throw new AzureToolkitRuntimeException("Flex consumption plan only supports Java 11 and Java 17");
         }
         // scale configuration
         if (Objects.nonNull(instanceSize) && !VALID_CONTAINER_SIZE.contains(instanceSize)) {
             throw new AzureToolkitRuntimeException(String.format(CV2_INVALID_CONTAINER_SIZE, VALID_CONTAINER_SIZE.stream().map(String::valueOf).collect(Collectors.joining(","))));
         }
-        if (Objects.nonNull(maximumInstances) && maximumInstances > MAX_MAX_INSTANCES) {
-            throw new AzureToolkitRuntimeException(CV2_INVALID_MAX_INSTANCE);
+        if (Objects.nonNull(maximumInstances) && (maximumInstances > MAX_MAX_INSTANCES || maximumInstances < MIN_MAX_INSTANCES)){
+            throw new AzureToolkitRuntimeException("Invalid value for <maximumInstances>, it should be in range [40, 1000]");
+        }
+        if (Objects.nonNull(httpInstanceConcurrency) && (httpInstanceConcurrency < MIN_HTTP_INSTANCE_CONCURRENCY || httpInstanceConcurrency > MAX_HTTP_INSTANCE_CONCURRENCY)) {
+            throw new AzureToolkitRuntimeException("Invalid value for <httpInstanceConcurrency>, it should be in range [1, 1000]");
         }
     }
 
