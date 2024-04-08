@@ -141,9 +141,6 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
         @Nullable final AppServicePlan newPlan = getAppServicePlan();
         final ContainerAppsEnvironment environment = getEnvironment();
         final Map<String, String> newAppSettings = getAppSettings();
-        if(isFlexConsumption){
-            newAppSettings.remove("FUNCTIONS_WORKER_RUNTIME");
-        }
         final DiagnosticConfig newDiagnosticConfig = getDiagnosticConfig();
         final String funcExtVersion = Optional.ofNullable(newAppSettings).map(map -> map.get(FUNCTIONS_EXTENSION_VERSION)).orElse(null);
         final StorageAccount storageAccount = getStorageAccount();
@@ -423,6 +420,16 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
             Optional.ofNullable(deploymentAccount).ifPresent(account ->
                 appSettings.put(authentication.getStorageAccountConnectionStringName(), account.getConnectionString()));
         }
+        // Remove deprecated app settings
+        // Refers Flex Consumption Portal and Dev Tooling Public Preview Spec
+        appSettings.remove("FUNCTIONS_EXTENSION_VERSION");
+        appSettings.remove("FUNCTIONS_WORKER_RUNTIME");
+        appSettings.remove("FUNCTIONS_WORKER_RUNTIME_VERSION");
+        appSettings.remove("FUNCTIONS_MAX_HTTP_CONCURRENCY");
+        appSettings.remove("FUNCTIONS_WORKER_PROCESS_COUNT");
+        appSettings.remove("FUNCTIONS_WORKER_DYNAMIC_CONCURRENCY_ENABLED");
+        appSettings.remove("WEBSITE_CONTENTAZUREFILECONNECTIONSTRING");
+        appSettings.remove("WEBSITE_CONTENTSHARE");
         final List<NameValuePair> settings = appSettings.entrySet().stream()
             .map(entry -> new NameValuePair().withName(entry.getKey()).withValue(entry.getValue()))
             .collect(Collectors.toList());
@@ -432,6 +439,7 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
         siteInner.withHttpsOnly(false);
         siteInner.withIsXenon(null);
         siteInner.withContainerSize(null);
+        siteInner.withReserved(null);
         Optional.ofNullable(siteInner.siteConfig()).ifPresent(config -> {
             config.withFtpsState(null);
             config.withUse32BitWorkerProcess(null);
