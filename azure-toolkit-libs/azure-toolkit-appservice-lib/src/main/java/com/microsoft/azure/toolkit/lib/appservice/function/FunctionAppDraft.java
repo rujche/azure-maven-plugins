@@ -217,8 +217,9 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
         messager.info(AzureString.format("Start creating Function App({0})...", name));
         com.azure.resourcemanager.appservice.models.FunctionApp functionApp = Objects.requireNonNull(this.doModify(() -> {
             if (isFlexConsumption) {
-                final com.azure.resourcemanager.appservice.models.FunctionApp app = createOrUpdateFlexConsumptionFunctionAppWithRawRequest((com.azure.resourcemanager.appservice.models.FunctionApp) withCreate);
-                return updateFlexFunctionAppIdentityConfiguration(app, Objects.requireNonNull(getFlexConsumptionConfiguration()));
+                return createOrUpdateFlexConsumptionFunctionAppWithRawRequest((com.azure.resourcemanager.appservice.models.FunctionApp) withCreate);
+                // todo: update identity configuration once service supports identity authentication,
+                // return updateFlexFunctionAppIdentityConfiguration(app, Objects.requireNonNull(getFlexConsumptionConfiguration()));
             } else {
                 return withCreate.create();
             }
@@ -231,6 +232,8 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
         return functionApp;
     }
 
+    // todo: replace implementation with raw request or latest sdk, as service will throw exception with sdk update request (no functionAppConfig)
+    @Deprecated
     private com.azure.resourcemanager.appservice.models.FunctionApp updateFlexFunctionAppIdentityConfiguration(final com.azure.resourcemanager.appservice.models.FunctionApp app,
                                                                                                                final FlexConsumptionConfiguration configuration) {
         final Update update = app.update();
@@ -341,9 +344,9 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
             messager.info(AzureString.format("Start updating Function App({0})...", remote.name()));
             remote = Objects.requireNonNull(this.doModify(() -> {
                 if (isFlexConsumption) {
-                    final com.azure.resourcemanager.appservice.models.FunctionApp app =
-                        createOrUpdateFlexConsumptionFunctionAppWithRawRequest((com.azure.resourcemanager.appservice.models.FunctionApp) update);
-                    return updateFlexFunctionAppIdentityConfiguration(app, Objects.requireNonNull(newFlexConsumptionConfiguration));
+                    return createOrUpdateFlexConsumptionFunctionAppWithRawRequest((com.azure.resourcemanager.appservice.models.FunctionApp) update);
+                    // todo: update identity configuration once service supports identity authentication,
+                    // return updateFlexFunctionAppIdentityConfiguration(app, Objects.requireNonNull(newFlexConsumptionConfiguration));
                 } else {
                     return update.apply();
                 }
@@ -462,12 +465,14 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
         final com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.FunctionsRuntime runtime =
             com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.FunctionsRuntime.builder().version(ensureConfig().getRuntime().getJavaVersionNumber()).build();
         // Create FunctionScaleAndConcurrency
-        // todo: investigate how to support alwaysReadyInstances and triggers
+        // todo: support other trigger concurrency settings
+        final FunctionAppConfig.FunctionTriggers triggers = Optional.ofNullable(configuration.getHttpInstanceConcurrency()).map(FunctionAppConfig.FunctionTriggers::new).orElse(null);
         final com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.FunctionScaleAndConcurrency scaleAndConcurrency =
             com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.FunctionScaleAndConcurrency.builder()
                 .maximumInstanceCount(configuration.getMaximumInstances())
                 .instanceMemoryMB(configuration.getInstanceSize())
                 .alwaysReady(configuration.getAlwaysReadyInstances())
+                .triggers(triggers)
                 .build();
         return com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.builder()
             .deployment(deployment).scaleAndConcurrency(scaleAndConcurrency).runtime(runtime).build();
