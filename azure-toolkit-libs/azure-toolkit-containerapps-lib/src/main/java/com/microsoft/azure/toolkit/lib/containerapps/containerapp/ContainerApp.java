@@ -41,7 +41,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 @SuppressWarnings("unused")
-public class ContainerApp extends AbstractAzResource<ContainerApp, AzureContainerAppsServiceSubscription, com.azure.resourcemanager.appcontainers.models.ContainerApp> implements Deletable, StreamingLogSupport, ServiceLinkerConsumer  {
+public class ContainerApp extends AbstractAzResource<ContainerApp, AzureContainerAppsServiceSubscription, com.azure.resourcemanager.appcontainers.models.ContainerApp> implements Deletable, StreamingLogSupport, ServiceLinkerConsumer {
     public static final Action.Id<ContainerApp> BROWSE = Action.Id.of("user/containerapps.open_in_browser.app");
     public static final Action.Id<ContainerApp> UPDATE_IMAGE = Action.Id.of("user/containerapps.update_image.app");
 
@@ -75,8 +75,8 @@ public class ContainerApp extends AbstractAzResource<ContainerApp, AzureContaine
     protected void updateAdditionalProperties(@Nullable com.azure.resourcemanager.appcontainers.models.ContainerApp newRemote, @Nullable com.azure.resourcemanager.appcontainers.models.ContainerApp oldRemote) {
         super.updateAdditionalProperties(newRemote, oldRemote);
         this.latestRevision = Optional.ofNullable(newRemote)
-                .flatMap(c -> revisionModule.list().stream().filter(r -> Objects.equals(r.getName(), c.latestRevisionName())).findFirst())
-                .orElse(null);
+            .flatMap(c -> revisionModule.list().stream().filter(r -> Objects.equals(r.getName(), c.latestRevisionName())).findFirst())
+            .orElse(null);
     }
 
     @Override
@@ -92,25 +92,25 @@ public class ContainerApp extends AbstractAzResource<ContainerApp, AzureContaine
     @Nullable
     public RevisionMode revisionModel() {
         return Optional.ofNullable(getRemote())
-                .map(com.azure.resourcemanager.appcontainers.models.ContainerApp::configuration)
-                .map(Configuration::activeRevisionsMode)
-                .map(mode -> RevisionMode.fromString(mode.toString()))
-                .orElse(null);
+            .map(com.azure.resourcemanager.appcontainers.models.ContainerApp::configuration)
+            .map(Configuration::activeRevisionsMode)
+            .map(mode -> RevisionMode.fromString(mode.toString()))
+            .orElse(null);
     }
 
     @Nullable
     public IngressConfig getIngressConfig() {
         return Optional.ofNullable(getRemote())
-                .map(com.azure.resourcemanager.appcontainers.models.ContainerApp::configuration)
-                .map(conf -> IngressConfig.fromIngress(conf.ingress())).orElse(null);
+            .map(com.azure.resourcemanager.appcontainers.models.ContainerApp::configuration)
+            .map(conf -> IngressConfig.fromIngress(conf.ingress())).orElse(null);
     }
 
     @Nullable
     public RevisionMode getRevisionMode() {
         return Optional.ofNullable(getRemote())
-                .map(com.azure.resourcemanager.appcontainers.models.ContainerApp::configuration)
-                .map(Configuration::activeRevisionsMode)
-                .map(arm -> RevisionMode.fromString(arm.toString())).orElse(null);
+            .map(com.azure.resourcemanager.appcontainers.models.ContainerApp::configuration)
+            .map(Configuration::activeRevisionsMode)
+            .map(arm -> RevisionMode.fromString(arm.toString())).orElse(null);
     }
 
     @Nullable
@@ -133,7 +133,7 @@ public class ContainerApp extends AbstractAzResource<ContainerApp, AzureContaine
     public ContainerAppsEnvironment getManagedEnvironment() {
         final String managedEnvironmentId = getManagedEnvironmentId();
         return StringUtils.isEmpty(managedEnvironmentId) ? null :
-                Azure.az(AzureContainerApps.class).environments(this.getSubscriptionId()).get(managedEnvironmentId);
+            Azure.az(AzureContainerApps.class).environments(this.getSubscriptionId()).get(managedEnvironmentId);
     }
 
     @Nullable
@@ -154,7 +154,7 @@ public class ContainerApp extends AbstractAzResource<ContainerApp, AzureContaine
     @Nullable
     public Revision getLatestRevision() {
         return Optional.ofNullable(getLatestRevisionName())
-                .map(name -> this.revisions().get(name, this.getResourceGroupName())).orElse(null);
+            .map(name -> this.revisions().get(name, this.getResourceGroupName())).orElse(null);
     }
 
     @Nullable
@@ -228,8 +228,15 @@ public class ContainerApp extends AbstractAzResource<ContainerApp, AzureContaine
         return revisionModule.list();
     }
 
+    @Nullable
+    public Container getContainer() {
+        return this.remoteOptional().map(com.azure.resourcemanager.appcontainers.models.ContainerApp::template)
+            .map(Template::containers).filter(CollectionUtils::isNotEmpty).map(l -> l.get(0)).orElse(null);
+    }
+
     // refer to https://github.com/Azure/azure-cli-extensions/blob/main/src/containerapp/azext_containerapp/custom.py
-    public @Nullable String getLogStreamEndpoint() {
+    @Nullable
+    public String getLogStreamEndpoint() {
         if (!this.exists()) {
             throw new AzureToolkitRuntimeException(AzureString.format("resource ({0}) not found", getName()).toString());
         }
