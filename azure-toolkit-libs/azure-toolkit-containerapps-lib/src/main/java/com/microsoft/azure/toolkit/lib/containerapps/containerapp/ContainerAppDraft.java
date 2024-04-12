@@ -7,6 +7,7 @@ package com.microsoft.azure.toolkit.lib.containerapps.containerapp;
 
 import com.azure.resourcemanager.appcontainers.implementation.ContainerAppImpl;
 import com.azure.resourcemanager.appcontainers.models.ActiveRevisionsMode;
+import com.azure.resourcemanager.appcontainers.models.BuildResource;
 import com.azure.resourcemanager.appcontainers.models.Configuration;
 import com.azure.resourcemanager.appcontainers.models.Container;
 import com.azure.resourcemanager.appcontainers.models.ContainerApps;
@@ -14,6 +15,9 @@ import com.azure.resourcemanager.appcontainers.models.EnvironmentVar;
 import com.azure.resourcemanager.appcontainers.models.RegistryCredentials;
 import com.azure.resourcemanager.appcontainers.models.Secret;
 import com.azure.resourcemanager.appcontainers.models.Template;
+import com.azure.resourcemanager.containerregistry.models.RegistryTaskRun;
+import com.google.common.collect.Sets;
+import com.microsoft.azure.toolkit.lib.Azure;
 import com.microsoft.azure.toolkit.lib.common.action.Action;
 import com.microsoft.azure.toolkit.lib.common.action.AzureActionManager;
 import com.microsoft.azure.toolkit.lib.common.bundle.AzureString;
@@ -24,30 +28,41 @@ import com.microsoft.azure.toolkit.lib.common.model.Region;
 import com.microsoft.azure.toolkit.lib.common.model.Subscription;
 import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
 import com.microsoft.azure.toolkit.lib.common.task.AzureTaskManager;
+import com.microsoft.azure.toolkit.lib.common.utils.Utils;
 import com.microsoft.azure.toolkit.lib.containerapps.environment.ContainerAppsEnvironment;
 import com.microsoft.azure.toolkit.lib.containerapps.environment.ContainerAppsEnvironmentDraft;
 import com.microsoft.azure.toolkit.lib.containerapps.model.IngressConfig;
 import com.microsoft.azure.toolkit.lib.containerapps.model.RevisionMode;
+import com.microsoft.azure.toolkit.lib.containerregistry.AzureContainerRegistry;
+import com.microsoft.azure.toolkit.lib.containerregistry.AzureContainerRegistryModule;
 import com.microsoft.azure.toolkit.lib.containerregistry.ContainerRegistry;
+import com.microsoft.azure.toolkit.lib.containerregistry.ContainerRegistryDraft;
+import com.microsoft.azure.toolkit.lib.containerregistry.model.Sku;
 import com.microsoft.azure.toolkit.lib.resource.ResourceGroup;
-import lombok.Builder;
 import lombok.Data;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static com.microsoft.azure.toolkit.lib.containerregistry.ContainerRegistry.ACR_IMAGE_SUFFIX;
+
 public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<ContainerApp, com.azure.resourcemanager.appcontainers.models.ContainerApp> {
+
     @Getter
     @Nullable
     private final ContainerApp origin;
@@ -78,11 +93,12 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         final ContainerApps client = Objects.requireNonNull(((ContainerAppModule) getModule()).getClient());
 
         final ContainerAppsEnvironment containerAppsEnvironment = Objects.requireNonNull(ensureConfig().getEnvironment(),
-                "Environment is required to create Container app.");
+            "Environment is required to create Container app.");
         if (containerAppsEnvironment.isDraftForCreating()) {
             ((ContainerAppsEnvironmentDraft) containerAppsEnvironment).commit();
         }
         final ImageConfig imageConfig = Objects.requireNonNull(ensureConfig().getImageConfig(), "Image is required to create Container app.");
+        buildImageIfNeeded(imageConfig);
         final Configuration configuration = new Configuration();
         Optional.ofNullable(ensureConfig().getRevisionMode()).ifPresent(mode ->
             configuration.withActiveRevisionsMode(ActiveRevisionsMode.fromString(ensureConfig().getRevisionMode().getValue())));
@@ -104,39 +120,6 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         return result;
     }
 
-    @Nullable
-    public IngressConfig getIngressConfig() {
-        return Optional.ofNullable(config).map(Config::getIngressConfig).orElse(super.getIngressConfig());
-    }
-
-    @Nullable
-    public RevisionMode getRevisionMode() {
-        return Optional.ofNullable(config).map(Config::getRevisionMode).orElse(super.getRevisionMode());
-    }
-
-    @Nullable
-    @Override
-    public ContainerAppsEnvironment getManagedEnvironment() {
-        return Optional.ofNullable(config).map(Config::getEnvironment).orElseGet(super::getManagedEnvironment);
-    }
-
-    @Nullable
-    @Override
-    public String getManagedEnvironmentId() {
-        return Optional.ofNullable(config).map(Config::getEnvironment).map(ContainerAppsEnvironment::getId).orElseGet(super::getManagedEnvironmentId);
-    }
-
-    @Nullable
-    @Override
-    public Region getRegion() {
-        return Optional.ofNullable(config).map(Config::getRegion).orElseGet(super::getRegion);
-    }
-
-    @Override
-    public boolean isIngressEnabled() {
-        return Optional.ofNullable(config).map(Config::getIngressConfig).map(IngressConfig::isEnableIngress).orElseGet(super::isIngressEnabled);
-    }
-
     @Nonnull
     @Override
     @AzureOperation(name = "azure/containerapps.update_app.app", params = {"this.getName()"})
@@ -154,6 +137,7 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         if (!isModified) {
             return origin;
         }
+        buildImageIfNeeded(imageConfig);
         final ContainerAppImpl update =
             (ContainerAppImpl) (isImageModified ? this.updateImage(origin) : origin.update());
         final Configuration configuration = update.configuration();
@@ -204,6 +188,77 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         return update.withTemplate(origin.template().withContainers(getContainers(config)));
     }
 
+    public void buildImageIfNeeded(ImageConfig imageConfig) {
+        if (!Optional.ofNullable(imageConfig).map(ImageConfig::getBuildImageConfig).map(b -> b.source).filter(Files::exists).isPresent()) {
+            return;
+        }
+        final BuildImageConfig buildConfig = Objects.requireNonNull(imageConfig.getBuildImageConfig());
+        final String fullImageName;
+        if (imageConfig.sourceHasDockerFile()) {
+            // ACR Task is the only way we have for now to build a Dockerfile using Docker.
+            AzureMessager.getMessager().warning("Dockerfile detected. Running the build through ACR.");
+            final ContainerRegistry registry = getOrCreateRegistry(imageConfig);
+            tarSourceIfNeeded(buildConfig);
+            final RegistryTaskRun run = registry.buildImage(imageConfig.getAcrImageNameWithTag(), buildConfig.getSource());
+            fullImageName = registry.waitForImageBuilding(run);
+        } else {
+            AzureMessager.getMessager().warning("No Dockerfile detected. Building container image through Container Apps cloud build.");
+            final ContainerAppsEnvironment environment = Objects.requireNonNull(this.getManagedEnvironment());
+            tarSourceIfNeeded(buildConfig);
+            final BuildResource build = environment.buildImage(buildConfig.getSource(), buildConfig.sourceBuildEnv);
+            fullImageName = environment.waitForImageBuilding(build);
+        }
+        if (StringUtils.isNotBlank(fullImageName)) {
+            imageConfig.setFullImageName(fullImageName);
+        }
+    }
+
+    private static void tarSourceIfNeeded(final BuildImageConfig buildConfig) {
+        if (Files.isDirectory(buildConfig.source)) {
+            final HashSet<String> ignored = Sets.newHashSet(".git", ".gitignore", ".bzr", "bzrignore", ".hg", ".hgignore", ".svn");
+            AzureMessager.getMessager().info(AzureString.format("Creating tar.gz from %s.", buildConfig.source.getFileName()));
+            final Path sourceTar = Utils.tar(buildConfig.source, (path) -> ignored.contains(path.getFileName().toString()));
+            buildConfig.setSource(sourceTar);
+        }
+    }
+
+    @Nonnull
+    private ContainerRegistry getOrCreateRegistry(final ImageConfig config) {
+        ContainerRegistry registry = config.getContainerRegistry();
+        if (Objects.isNull(registry)) {
+            final String registryName = Objects.requireNonNull(config.getAcrRegistryName());
+            final AzureContainerRegistryModule registryModule = Azure.az(AzureContainerRegistry.class)
+                .registry(this.getSubscriptionId());
+            registry = registryModule.get(registryName, this.getResourceGroupName());
+            if (Objects.isNull(registry)) {
+                final List<ContainerRegistry> registries = registryModule.listByResourceGroup(this.getResourceGroupName());
+                if (!registries.isEmpty()) {
+                    registry = registries.stream().filter(ContainerRegistry::isAdminUserEnabled).findAny().orElse(null);
+                    if (Objects.isNull(registry)) {
+                        registry = registries.stream().findFirst().orElse(null);
+                    }
+                }
+                if (Objects.isNull(registry)) {
+                    AzureMessager.getMessager().info(AzureString.format("creating new container registry %s with admin user enabled.", registryName));
+                    registry = registryModule.create(registryName, this.getResourceGroupName());
+                    final ContainerRegistryDraft draft = (ContainerRegistryDraft) registry;
+                    draft.setSku(Sku.Standard);
+                    draft.setAdminUserEnabled(true);
+                    draft.setRegion(Optional.ofNullable(this.getRegion()).orElse(Region.US_EAST));
+                    draft.commit();
+                } else {
+                    AzureMessager.getMessager().info(AzureString.format("use container registry %s.", registry.getName()));
+                }
+            }
+        }
+        if (!registry.isAdminUserEnabled()) {// enable admin user
+            AzureMessager.getMessager().info(AzureString.format("Enabling admin user for container registry %s.", registry.getName()));
+            registry.enableAdminUser();
+        }
+        config.setContainerRegistry(registry);
+        return registry;
+    }
+
     @Nullable
     private static Secret getSecret(final ImageConfig config) {
         final ContainerRegistry registry = config.getContainerRegistry();
@@ -237,7 +292,9 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
     }
 
     private static String getContainerNameForImage(String containerImageName) {
-        return containerImageName.substring(containerImageName.lastIndexOf('/') + 1).replaceAll("[^0-9a-zA-Z-]", "-");
+        final String name = containerImageName.substring(containerImageName.lastIndexOf('/') + 1).replaceAll("[^0-9a-zA-Z-]", "-").toLowerCase();
+        // The length of container name can not be more than 46.
+        return StringUtils.substring(name, 0, 46);
     }
 
     @Nonnull
@@ -245,6 +302,40 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         this.config = Optional.ofNullable(this.config).orElseGet(Config::new);
         return this.config;
     }
+
+    @Nullable
+    public IngressConfig getIngressConfig() {
+        return Optional.ofNullable(config).map(Config::getIngressConfig).orElse(super.getIngressConfig());
+    }
+
+    @Nullable
+    public RevisionMode getRevisionMode() {
+        return Optional.ofNullable(config).map(Config::getRevisionMode).orElse(super.getRevisionMode());
+    }
+
+    @Nullable
+    @Override
+    public ContainerAppsEnvironment getManagedEnvironment() {
+        return Optional.ofNullable(config).map(Config::getEnvironment).orElseGet(super::getManagedEnvironment);
+    }
+
+    @Nullable
+    @Override
+    public String getManagedEnvironmentId() {
+        return Optional.ofNullable(config).map(Config::getEnvironment).map(ContainerAppsEnvironment::getId).orElseGet(super::getManagedEnvironmentId);
+    }
+
+    @Nullable
+    @Override
+    public Region getRegion() {
+        return Optional.ofNullable(config).map(Config::getRegion).orElseGet(super::getRegion);
+    }
+
+    @Override
+    public boolean isIngressEnabled() {
+        return Optional.ofNullable(config).map(Config::getIngressConfig).map(IngressConfig::isEnableIngress).orElseGet(super::isIngressEnabled);
+    }
+
 
     @Override
     public boolean isModified() {
@@ -270,14 +361,13 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
     @Getter
     public static class ImageConfig {
         @Nonnull
-        private final String fullImageName;
+        private String fullImageName;
         @Nullable
         private ContainerRegistry containerRegistry;
         @Nonnull
         private List<EnvironmentVar> environmentVariables = new ArrayList<>();
         @Nullable
-        private File source;
-        private Map<String, String> sourceBuildEnv;
+        private BuildImageConfig buildImageConfig;
 
         public ImageConfig(@Nonnull String fullImageName) {
             this.fullImageName = fullImageName;
@@ -286,5 +376,37 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         public String getTag() {
             return Optional.of(fullImageName.substring(fullImageName.lastIndexOf(':') + 1)).filter(StringUtils::isNotBlank).orElse("latest");
         }
+
+        public String getRegistryUrl() {
+            return fullImageName.substring(0, fullImageName.indexOf('/'));
+        }
+
+        @Nullable
+        public String getAcrRegistryName() {
+            final String registryUrl = this.getRegistryUrl();
+            if (registryUrl.endsWith(ACR_IMAGE_SUFFIX)) {
+                return registryUrl.substring(0, registryUrl.length() - ACR_IMAGE_SUFFIX.length());
+            }
+            return null;
+        }
+
+        public String getAcrImageNameWithTag() {
+            return fullImageName.substring(fullImageName.indexOf('/') + 1);
+        }
+
+        public boolean sourceHasDockerFile() {
+            return Optional.ofNullable(buildImageConfig)
+                .map(BuildImageConfig::getSource).filter(Files::isDirectory)
+                .map(p -> Files.isRegularFile(Paths.get(p.toString(), "Dockerfile"))).orElse(false);
+        }
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class BuildImageConfig {
+        @Nonnull
+        private Path source;
+        private Map<String, String> sourceBuildEnv;
     }
 }

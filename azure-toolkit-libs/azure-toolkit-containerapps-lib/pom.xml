@@ -38,6 +38,10 @@
             <groupId>com.microsoft.azure</groupId>
             <artifactId>azure-toolkit-monitor-lib</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpmime</artifactId>
+        </dependency>
     </dependencies>
     <build>
         <plugins>
