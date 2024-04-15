@@ -106,7 +106,7 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         configuration.withRegistries(Optional.ofNullable(getRegistryCredential(imageConfig)).map(Collections::singletonList).orElse(Collections.emptyList()));
         configuration.withIngress(Optional.ofNullable(ensureConfig().getIngressConfig()).map(IngressConfig::toIngress).orElse(null));
         final Template template = new Template().withContainers(getContainers(imageConfig));
-        AzureMessager.getMessager().info(AzureString.format("Start creating Azure Container App({0})...", this.getName()));
+        AzureMessager.getMessager().progress(AzureString.format("Creating Azure Container App({0})...", this.getName()));
         final com.azure.resourcemanager.appcontainers.models.ContainerApp result = client.define(ensureConfig().getName())
             .withRegion(com.azure.core.management.Region.fromName(ensureConfig().getRegion().getName()))
             .withExistingResourceGroup(Objects.requireNonNull(ensureConfig().getResourceGroup(), "Resource Group is required to create Container app.").getResourceGroupName())
@@ -154,7 +154,7 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
             configuration.withActiveRevisionsMode(revisionMode.toActiveRevisionMode());
         }
         update.withConfiguration(configuration);
-        messager.info(AzureString.format("Start updating Container App({0})...", getName()));
+        messager.progress(AzureString.format("Updating Container App({0})...", getName()));
         final com.azure.resourcemanager.appcontainers.models.ContainerApp result = update.apply();
         final Action<ContainerApp> browse = AzureActionManager.getInstance().getAction(ContainerApp.BROWSE).bind(this);
         messager.success(AzureString.format("Container App({0}) is successfully updated.", getName()), browse);
@@ -216,7 +216,7 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
     private static void tarSourceIfNeeded(final BuildImageConfig buildConfig) {
         if (Files.isDirectory(buildConfig.source)) {
             final HashSet<String> ignored = Sets.newHashSet(".git", ".gitignore", ".bzr", "bzrignore", ".hg", ".hgignore", ".svn");
-            AzureMessager.getMessager().info(AzureString.format("Creating tar.gz from %s.", buildConfig.source.getFileName()));
+            AzureMessager.getMessager().progress(AzureString.format("Creating tar.gz from %s.", buildConfig.source.getFileName()));
             final Path sourceTar = Utils.tar(buildConfig.source, (path) -> ignored.contains(path.getFileName().toString()));
             buildConfig.setSource(sourceTar);
         }

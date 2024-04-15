@@ -144,11 +144,11 @@ public class ContainerAppsEnvironment extends AbstractAzResource<ContainerAppsEn
         final String buildId = String.format("build%s", uuid).substring(0, 12);
         final String newBuilderName = String.format("builder%s", uuid).substring(0, 12);
 
-        AzureMessager.getMessager().info(AzureString.format("Starting the Cloud Build for build of id '%s'", buildId));
+        AzureMessager.getMessager().progress(AzureString.format("Starting the Cloud Build for build of id '%s'", buildId));
         final BuilderResource builder = getOrCreateBuilder(newBuilderName);
 
         // create a build
-        AzureMessager.getMessager().info(AzureString.format("Creating build '%s' with builder '%s'", buildId, builder.name()));
+        AzureMessager.getMessager().progress(AzureString.format("Creating build '%s' with builder '%s'", buildId, builder.name()));
         final List<EnvironmentVariable> variables = Optional.ofNullable(sourceBuildEnv).orElse(Collections.emptyMap())
             .entrySet().stream().map(e -> new EnvironmentVariable().withName(e.getKey()).withValue(e.getValue()))
             .collect(Collectors.toList());
@@ -165,7 +165,7 @@ public class ContainerAppsEnvironment extends AbstractAzResource<ContainerAppsEn
             "location", Optional.ofNullable(this.getRegion()).map(Region::getName).orElse(com.azure.core.management.Region.US_EAST.name()),
             "properties", Collections.emptyMap()
         );
-        AzureMessager.getMessager().info(AzureString.format("Loading token for uploading compressed source code."));
+        AzureMessager.getMessager().progress(AzureString.format("Loading token for uploading compressed source code."));
         final HttpRequest tokenRequest = new HttpRequest(HttpMethod.POST, ImplUtils.createUrl(tokenEndpoint), new HttpHeaders(), BinaryData.fromObject(body));
         final HttpPipeline pipeline = manager.serviceClient().getHttpPipeline();
         try (final HttpResponse tokenResponse = pipeline.send(tokenRequest).block()) {
@@ -184,7 +184,7 @@ public class ContainerAppsEnvironment extends AbstractAzResource<ContainerAppsEn
         final ImmutableSet<BuildProvisioningState> errorProvisioningStates = ImmutableSet.of(BuildProvisioningState.CANCELED, BuildProvisioningState.FAILED, BuildProvisioningState.DELETING);
         final ImmutableSet<BuildProvisioningState> waitingProvisioningStates = ImmutableSet.of(BuildProvisioningState.CREATING, BuildProvisioningState.UPDATING);
 
-        AzureMessager.getMessager().info(AzureString.format("Waiting for the build %s to be provisioned...", build.name()));
+        AzureMessager.getMessager().progress(AzureString.format("Waiting for the build %s to be provisioned...", build.name()));
         BuildProvisioningState provisioningState = build.provisioningState();
         while (waitingProvisioningStates.contains(provisioningState)) {
             ResourceManagerUtils.sleep(Duration.ofSeconds(3));
@@ -198,7 +198,7 @@ public class ContainerAppsEnvironment extends AbstractAzResource<ContainerAppsEn
 
         final ImmutableSet<BuildStatus> errorBuildingStates = ImmutableSet.of(BuildStatus.FAILED, BuildStatus.CANCELED);
         final ImmutableSet<BuildStatus> waitingBuildingStates = ImmutableSet.of(BuildStatus.NOT_STARTED, BuildStatus.IN_PROGRESS);
-        AzureMessager.getMessager().info(AzureString.format("Waiting for the build %s to be completed...", build.name()));
+        AzureMessager.getMessager().progress(AzureString.format("Waiting for the build %s to be completed...", build.name()));
         BuildStatus buildStatus = build.buildStatus();
         while (waitingBuildingStates.contains(buildStatus)) {
             ResourceManagerUtils.sleep(Duration.ofSeconds(3));
@@ -227,7 +227,7 @@ public class ContainerAppsEnvironment extends AbstractAzResource<ContainerAppsEn
             AzureMessager.getMessager().info(AzureString.format("Use existing builder %s in environment %s", builderName, this.getName()));
             return builder;
         }
-        AzureMessager.getMessager().info(AzureString.format("Creating new builder %s in environment %s", builderName, this.getName()));
+        AzureMessager.getMessager().progress(AzureString.format("Creating new builder %s in environment %s", builderName, this.getName()));
         return manager.builders().define(builderName)
             .withRegion(Optional.ofNullable(this.getRegion()).map(Region::getName).orElse(com.azure.core.management.Region.US_EAST.name()))
             .withExistingResourceGroup(this.getResourceGroupName())

@@ -99,13 +99,13 @@ public class Utils {
      * @throws AzureToolkitRuntimeException If there is no class file in target artifact or meet IOException when read target artifact
      */
     public static int getArtifactCompileVersion(@Nonnull final File artifact) throws AzureToolkitRuntimeException {
-        try (JarFile jarFile = new JarFile(artifact)) {
+        try (final JarFile jarFile = new JarFile(artifact)) {
             final Manifest manifest = jarFile.getManifest();
             final JarEntry userEntry = getUserEntry(jarFile, manifest);
             final JarEntry springStartEntry = getSpringStartEntry(jarFile, manifest);
             return Stream.of(userEntry, springStartEntry).filter(Objects::nonNull).mapToInt(entry -> getJarEntryJavaVersion(jarFile, entry)).max()
                 .orElseThrow(() -> new AzureToolkitRuntimeException("Failed to parse artifact compile version, no valid class file founded in target artifact"));
-        } catch (IOException e) {
+        } catch (final IOException e) {
             throw new AzureToolkitRuntimeException("Failed to parse artifact compile version, no class file founded in target artifact", e);
         }
     }
@@ -132,7 +132,7 @@ public class Utils {
             stream.read(version);
             stream.close();
             return new BigInteger(version).intValueExact() - 44;
-        } catch (IOException e) {
+        } catch (final IOException e) {
             throw new AzureToolkitRuntimeException(String.format("Failed to parse compile version of entry %s", jarEntry.getName()), e);
         }
     }
@@ -146,7 +146,7 @@ public class Utils {
     public static boolean isGUID(String input) {
         try {
             return UUID.fromString(input).toString().equalsIgnoreCase(input);
-        } catch (Exception e) {
+        } catch (final Exception e) {
             return false;
         }
     }
@@ -154,6 +154,7 @@ public class Utils {
     // Copied from https://github.com/microsoft/azure-tools-for-java/blob/azure-intellij-toolkit-v3.39.0/Utils/
     // azuretools-core/src/com/microsoft/azuretools/core/mvp/model/AzureMvpModel.java
     // Todo: Remove duplicated utils function in azure-tools-for-java
+    @Nullable
     public static String getSegment(String id, String segment) {
         if (StringUtils.isEmpty(id)) {
             return null;
@@ -211,7 +212,7 @@ public class Utils {
         final Process p = Runtime.getRuntime().exec(cmds, null, cwd);
         final int exitCode = p.waitFor();
         if (exitCode != 0) {
-            String errorLog = IOUtils.toString(p.getErrorStream(), StandardCharsets.UTF_8);
+            final String errorLog = IOUtils.toString(p.getErrorStream(), StandardCharsets.UTF_8);
             throw new CommandExecuteException(String.format("Cannot execute '%s' due to error: %s", cmd, errorLog));
         }
         return IOUtils.toString(p.getInputStream(), StandardCharsets.UTF_8);
@@ -240,7 +241,7 @@ public class Utils {
     }
 
     public static <T> Predicate<T> distinctByKey(Function<? super T, ?> keyExtractor) {
-        Set<Object> seen = ConcurrentHashMap.newKeySet();
+        final Set<Object> seen = ConcurrentHashMap.newKeySet();
         return t -> seen.add(keyExtractor.apply(t));
     }
 
@@ -252,7 +253,7 @@ public class Utils {
     }
 
     public static <T> void copyProperties(T to, T from, boolean whenNotSet) throws IllegalAccessException {
-        for (Field field : FieldUtils.getAllFields(from.getClass())) {
+        for (final Field field : FieldUtils.getAllFields(from.getClass())) {
             if (Modifier.isFinal(field.getModifiers()) || Modifier.isStatic(field.getModifiers())) {
                 continue;
             }
@@ -270,12 +271,11 @@ public class Utils {
         }
     }
 
+    @Nullable
     public static <T> T emptyToNull(T t) {
-        if (t instanceof Map && MapUtils.isEmpty((Map<?, ?>) t)) {
-            return null;
-        } else if (t instanceof CharSequence && StringUtils.isBlank((CharSequence) t)) {
-            return null;
-        } else if (t instanceof Collection && CollectionUtils.isEmpty((Collection<?>) t)) {
+        if (t instanceof Map && MapUtils.isEmpty((Map<?, ?>) t) ||
+            t instanceof CharSequence && StringUtils.isBlank((CharSequence) t) ||
+            t instanceof Collection && CollectionUtils.isEmpty((Collection<?>) t)) {
             return null;
         }
         return t;
@@ -289,7 +289,7 @@ public class Utils {
             con.setRequestMethod("HEAD");
             con.setReadTimeout(DEFAULT_TIMEOUT);
             return ArrayUtils.contains(validResponseCodes, con.getResponseCode());
-        } catch (IOException ex) {
+        } catch (final IOException ex) {
             return false;
         } finally {
             Optional.ofNullable(con).ifPresent(HttpURLConnection::disconnect);
@@ -300,6 +300,7 @@ public class Utils {
         return list.stream().anyMatch(item -> StringUtils.equalsIgnoreCase(target, item));
     }
 
+    @Nullable
     @SuppressWarnings("unchecked")
     public static <T> T get(Map<String, Object> data, String path) {
         if (!path.startsWith("$.")) {
@@ -323,11 +324,11 @@ public class Utils {
             throw new IOException("Please provide a directory.");
         }
         // get folder name as zip file name
-        Path tarFilePath = Paths.get(System.getProperty("java.io.tmpdir")).resolve(String.format("build_archive_%s.tar.gz", UUID.randomUUID()));
-        try (OutputStream fOut = Files.newOutputStream(tarFilePath);
-             BufferedOutputStream buffOut = new BufferedOutputStream(fOut);
-             GzipCompressorOutputStream gzOut = new GzipCompressorOutputStream(buffOut);
-             TarArchiveOutputStream tOut = new TarArchiveOutputStream(gzOut)) {
+        final Path tarFilePath = Paths.get(System.getProperty("java.io.tmpdir")).resolve(String.format("build_archive_%s.tar.gz", UUID.randomUUID()));
+        try (final OutputStream fOut = Files.newOutputStream(tarFilePath);
+             final BufferedOutputStream buffOut = new BufferedOutputStream(fOut);
+             final GzipCompressorOutputStream gzOut = new GzipCompressorOutputStream(buffOut);
+             final TarArchiveOutputStream tOut = new TarArchiveOutputStream(gzOut)) {
             tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
             Files.walkFileTree(source, new SimpleFileVisitor<Path>() {
                 @Override
@@ -345,15 +346,15 @@ public class Utils {
                         return FileVisitResult.CONTINUE;
                     }
                     // get filename
-                    Path targetFile = source.relativize(path);
+                    final Path targetFile = source.relativize(path);
                     try {
-                        TarArchiveEntry tarEntry = new TarArchiveEntry(path.toFile(), targetFile.toString());
+                        final TarArchiveEntry tarEntry = new TarArchiveEntry(path.toFile(), targetFile.toString());
                         tOut.putArchiveEntry(tarEntry);
                         Files.copy(path, tOut);
                         tOut.closeArchiveEntry();
-                        System.out.printf("compress : %s%n", path);
-                    } catch (IOException e) {
-                        AzureMessager.getMessager().warning(AzureString.format("Unable to tar.gz : %s", path));
+                        AzureMessager.getMessager().progress(AzureString.format("compressing : %s", path));
+                    } catch (final IOException e) {
+                        AzureMessager.getMessager().warning(AzureString.format("Unable to compress : %s", path));
                     }
                     return FileVisitResult.CONTINUE;
                 }
