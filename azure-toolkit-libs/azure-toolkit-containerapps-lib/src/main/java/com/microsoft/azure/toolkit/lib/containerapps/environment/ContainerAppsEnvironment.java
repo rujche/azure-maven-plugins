@@ -32,6 +32,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.microsoft.azure.toolkit.lib.Azure;
 import com.microsoft.azure.toolkit.lib.common.action.Action;
+import com.microsoft.azure.toolkit.lib.common.action.AzureActionManager;
 import com.microsoft.azure.toolkit.lib.common.bundle.AzureString;
 import com.microsoft.azure.toolkit.lib.common.exception.AzureToolkitRuntimeException;
 import com.microsoft.azure.toolkit.lib.common.messager.AzureMessager;
@@ -42,6 +43,7 @@ import com.microsoft.azure.toolkit.lib.common.model.Deletable;
 import com.microsoft.azure.toolkit.lib.common.model.Region;
 import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
 import com.microsoft.azure.toolkit.lib.common.utils.StreamingLogSupport;
+import com.microsoft.azure.toolkit.lib.common.utils.UrlStreamingLog;
 import com.microsoft.azure.toolkit.lib.containerapps.AzureContainerApps;
 import com.microsoft.azure.toolkit.lib.containerapps.AzureContainerAppsServiceSubscription;
 import com.microsoft.azure.toolkit.lib.containerapps.containerapp.ContainerApp;
@@ -138,7 +140,6 @@ public class ContainerAppsEnvironment extends AbstractAzResource<ContainerAppsEn
         return "Bearer " + authToken;
     }
 
-    @SneakyThrows({MalformedURLException.class, JsonProcessingException.class})
     public BuildResource buildImage(final Path sourceTar, Map<String, String> sourceBuildEnv) {
         final UUID uuid = UUID.randomUUID();
         final String buildId = String.format("build%s", uuid).substring(0, 12);
@@ -159,7 +160,18 @@ public class ContainerAppsEnvironment extends AbstractAzResource<ContainerAppsEn
             .create();
 
         // upload source code.
+        final String token = getImageBuildAuthToken(build);
         final String uploadEndpoint = build.uploadEndpoint() + "?api-version=" + manager.serviceClient().getApiVersion();
+        this.uploadFile(sourceTar, uploadEndpoint, token);
+        AzureMessager.getMessager().info("Source code is uploaded successfully.");
+        return build;
+    }
+
+    // todo: validate expiration of token and add cache based on build
+    @SneakyThrows({MalformedURLException.class, JsonProcessingException.class})
+    private String getImageBuildAuthToken(final BuildResource build) {
+
+        final ContainerAppsApiManager manager = Objects.requireNonNull(this.getParent().getRemote());
         final String tokenEndpoint = build.tokenEndpoint() + "?api-version=" + manager.serviceClient().getApiVersion();
         final ImmutableMap<String, Object> body = ImmutableMap.of(
             "location", Optional.ofNullable(this.getRegion()).map(Region::getName).orElse(com.azure.core.management.Region.US_EAST.name()),
@@ -171,12 +183,10 @@ public class ContainerAppsEnvironment extends AbstractAzResource<ContainerAppsEn
         try (final HttpResponse tokenResponse = pipeline.send(tokenRequest).block()) {
             if (Objects.nonNull(tokenResponse) && tokenResponse.getStatusCode() == 200) {
                 final String responseBodyString = tokenResponse.getBodyAsString().block();
-                final String token = mapper.readTree(responseBodyString).get("token").asText();
-                this.uploadFile(sourceTar, uploadEndpoint, token);
-                AzureMessager.getMessager().info("Source code is uploaded successfully.");
+                return mapper.readTree(responseBodyString).get("token").asText();
             }
         }
-        return build;
+        throw new AzureToolkitRuntimeException("Failed to get token for image build.");
     }
 
     @Nullable
@@ -184,7 +194,11 @@ public class ContainerAppsEnvironment extends AbstractAzResource<ContainerAppsEn
         final ImmutableSet<BuildProvisioningState> errorProvisioningStates = ImmutableSet.of(BuildProvisioningState.CANCELED, BuildProvisioningState.FAILED, BuildProvisioningState.DELETING);
         final ImmutableSet<BuildProvisioningState> waitingProvisioningStates = ImmutableSet.of(BuildProvisioningState.CREATING, BuildProvisioningState.UPDATING);
 
-        AzureMessager.getMessager().progress(AzureString.format("Waiting for the build %s to be provisioned...", build.name()));
+        final UrlStreamingLog urlStreamingLog = UrlStreamingLog.builder()
+            .authorization("Bearer " + getImageBuildAuthToken(build)).endpoint(build.logStreamEndpoint()).name(build.name()).build();
+        final Action<StreamingLogSupport> viewLogInToolkit = AzureActionManager.getInstance().getAction(StreamingLogSupport.OPEN_STREAMING_LOG)
+            .bind(urlStreamingLog).withLabel("Open streaming logs in toolkit");
+        AzureMessager.getMessager().info(AzureString.format("Waiting for the build %s to be provisioned...", build.name()), viewLogInToolkit);
         BuildProvisioningState provisioningState = build.provisioningState();
         while (waitingProvisioningStates.contains(provisioningState)) {
             ResourceManagerUtils.sleep(Duration.ofSeconds(3));

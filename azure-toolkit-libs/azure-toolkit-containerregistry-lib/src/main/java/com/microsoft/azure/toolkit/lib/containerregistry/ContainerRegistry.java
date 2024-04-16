@@ -29,6 +29,7 @@ import com.microsoft.azure.toolkit.lib.common.model.AbstractAzResource;
 import com.microsoft.azure.toolkit.lib.common.model.AbstractAzResourceModule;
 import com.microsoft.azure.toolkit.lib.common.model.Region;
 import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
+import com.microsoft.azure.toolkit.lib.common.utils.StreamingLogSupport;
 import com.microsoft.azure.toolkit.lib.containerregistry.model.Sku;
 import lombok.Getter;
 import org.apache.commons.collections4.CollectionUtils;
@@ -167,8 +168,11 @@ public class ContainerRegistry extends AbstractAzResource<ContainerRegistry, Azu
             logSasUrl = "https://" + logSasUrl;
         }
         final Action<String> openUrl = AzureActionManager.getInstance().getAction(Action.OPEN_URL);
-        final Action<String> viewLog = openUrl.bind(logSasUrl).withLabel("Open streaming logs in browser");
-        AzureMessager.getMessager().info(AzureString.format("Waiting for image building task run (%s) to be completed...", run.runId()), viewLog);
+        final Action<String> viewLogInBrowser = openUrl.bind(logSasUrl).withLabel("Open streaming logs in browser");
+        final RegistryTaskRunStreamingLog urlStreamingLog = RegistryTaskRunStreamingLog.builder().logSasUrl(logSasUrl).task(run).build();
+        final Action<StreamingLogSupport> viewLogInToolkit = AzureActionManager.getInstance().getAction(StreamingLogSupport.OPEN_STREAMING_LOG)
+            .bind(urlStreamingLog).withLabel("Open streaming logs in toolkit");
+        AzureMessager.getMessager().info(AzureString.format("Waiting for image building task run (%s) to be completed...", run.runId()), viewLogInToolkit, viewLogInBrowser);
         RunStatus status = run.status();
         while (waitingStatus.contains(status)) {
             ResourceManagerUtils.sleep(Duration.ofSeconds(10));
@@ -181,7 +185,7 @@ public class ContainerRegistry extends AbstractAzResource<ContainerRegistry, Azu
         }
         final ImageDescriptor image = images.get(0);
         final String fullImageName = String.format("%s/%s:%s", image.registry(), image.repository(), image.tag());
-        AzureMessager.getMessager().info(AzureString.format("Image building task run %s is completed successfully, image %s is built.", run.runId(), fullImageName), viewLog);
+        AzureMessager.getMessager().info(AzureString.format("Image building task run %s is completed successfully, image %s is built.", run.runId(), fullImageName), viewLogInBrowser);
         return fullImageName;
     }
 }
