@@ -19,7 +19,11 @@ import com.azure.resourcemanager.appservice.fluent.models.SiteConfigInner;
 import com.azure.resourcemanager.appservice.fluent.models.SiteInner;
 import com.azure.resourcemanager.appservice.models.FunctionApp.DefinitionStages;
 import com.azure.resourcemanager.appservice.models.FunctionApp.Update;
+import com.azure.resourcemanager.appservice.models.ManagedServiceIdentity;
+import com.azure.resourcemanager.appservice.models.ManagedServiceIdentityType;
 import com.azure.resourcemanager.appservice.models.NameValuePair;
+import com.azure.resourcemanager.appservice.models.UserAssignedIdentity;
+import com.azure.resourcemanager.authorization.AuthorizationManager;
 import com.azure.resourcemanager.authorization.models.BuiltInRole;
 import com.azure.resourcemanager.msi.MsiManager;
 import com.azure.resourcemanager.msi.models.Identity;
@@ -75,6 +79,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<FunctionApp, com.azure.resourcemanager.appservice.models.FunctionApp> {
@@ -229,23 +234,51 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
         return functionApp;
     }
 
-    // todo: replace implementation with raw request or latest sdk, as service will throw exception with sdk update request (no functionAppConfig)
-    @Deprecated
-    private com.azure.resourcemanager.appservice.models.FunctionApp updateFlexFunctionAppIdentityConfiguration(final com.azure.resourcemanager.appservice.models.FunctionApp app,
-                                                                                                               final FlexConsumptionConfiguration configuration) {
-        final Update update = app.update();
+    // todo: remove outdated codes after stable sdk which support flex consumption released
+    private void updateFlexFunctionAppIdentityConfiguration(final com.azure.resourcemanager.appservice.models.FunctionApp app, final FunctionAppConfig.Storage.Authentication configuration) throws IOException {
         final AppServiceManager manager = app.manager();
-        final StorageAccount deploymentAccount = ensureConfig().getDeploymentAccount();
-        if (configuration.getAuthenticationMethod() == StorageAuthenticationMethod.SystemAssignedIdentity) {
-            update.withSystemAssignedManagedServiceIdentity()
-                .withSystemAssignedIdentityBasedAccessTo(deploymentAccount.getId(), BuiltInRole.STORAGE_BLOB_DATA_CONTRIBUTOR);
-        } else if (configuration.getAuthenticationMethod() == StorageAuthenticationMethod.UserAssignedIdentity) {
+        // as we can't call sdk create/update method to create identity, we need to set the inner model manually and grant permissions manually later
+        // Refers WebAppMsiHandler, WebAppBaseImpl
+        if (configuration.getType() == StorageAuthenticationMethod.SystemAssignedIdentity) {
+            app.innerModel().withIdentity(new ManagedServiceIdentity().withType(ManagedServiceIdentityType.SYSTEM_ASSIGNED));
+            // authorizationManager.roleAssignments(storageAccount.getId(), BuiltInRole.STORAGE_BLOB_DATA_CONTRIBUTOR)
+        } else if (configuration.getType() == StorageAuthenticationMethod.UserAssignedIdentity) {
             final Subscription subscription = Azure.az(AzureAccount.class).account().getSubscription(getSubscriptionId());
             final MsiManager msiManager = MsiManager.authenticate(manager.httpPipeline(), new AzureProfile(subscription.getTenantId(), subscription.getId(), manager.environment()));
             final Identity identity = msiManager.identities().getById(configuration.getUserAssignedIdentityResourceId());
-            update.withUserAssignedManagedServiceIdentity().withExistingUserAssignedManagedServiceIdentity(identity);
+            final String identityJson = String.format("{\"principalId\" : \"%s\", \"clientId\" : \"%s\"}", identity.principalId(), identity.clientId());
+            final SerializerAdapter adapter = SerializerFactory.createDefaultManagementSerializerAdapter();
+            // todo: sync with sdk team to find a better way to create user identity object
+            final UserAssignedIdentity userAssignedIdentity = adapter.deserialize(identityJson, UserAssignedIdentity.class, SerializerEncoding.JSON);
+            app.innerModel().withIdentity(new ManagedServiceIdentity()
+                .withType(ManagedServiceIdentityType.USER_ASSIGNED)
+                .withUserAssignedIdentities(Collections.singletonMap(identity.id(), userAssignedIdentity)));
+            // update.withUserAssignedManagedServiceIdentity().withExistingUserAssignedManagedServiceIdentity(identity);
         }
-        return update.apply();
+    }
+
+    private void grantPermissionToIdentity(final com.azure.resourcemanager.appservice.models.FunctionApp result) {
+        final FunctionAppConfig config = super.getFlexConsumptionAppConfig();
+        final FunctionAppConfig.Storage storage = config.getDeployment().getStorage();
+        final FunctionAppConfig.Storage.Authentication authConfiguration = Objects.requireNonNull(storage.getAuthentication());
+        final StorageAccount storageAccount = Optional.ofNullable(ensureConfig().getDeploymentAccount())
+            .orElseGet(() -> ensureConfig().getStorageAccount());
+        if (Objects.isNull(storageAccount)) {
+            return;
+        }
+        final String identityId = authConfiguration.getType() == StorageAuthenticationMethod.SystemAssignedIdentity ?
+            result.identity().principalId() :
+            result.identity().userAssignedIdentities().entrySet().stream()
+                .filter(entry -> StringUtils.equalsIgnoreCase(entry.getKey(), authConfiguration.getUserAssignedIdentityResourceId()))
+                .findFirst()
+                .map(Map.Entry::getValue)
+                .map(UserAssignedIdentity::principalId).orElseThrow(()-> new RuntimeException("User assigned identity not found"));
+        final String roleAssignmentName = UUID.randomUUID().toString();
+        final AuthorizationManager authorizationManager = Objects.requireNonNull(this.getParent().getRemote()).authorizationManager();
+        authorizationManager.roleAssignments().define(roleAssignmentName)
+            .forObjectId(identityId)
+            .withBuiltInRole(BuiltInRole.STORAGE_BLOB_DATA_CONTRIBUTOR)
+            .withScope(storageAccount.getId()).create();
     }
 
     private boolean shouldEnableDistributedTracing(@Nullable final AppServicePlan servicePlan, @Nullable final Map<String, String> appSettings) {
@@ -367,11 +400,18 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
 
     private com.azure.resourcemanager.appservice.models.FunctionApp createOrUpdateFlexConsumptionFunctionAppWithRawRequest(com.azure.resourcemanager.appservice.models.FunctionApp functionApp) throws IOException {
         // serialize inner object into json
-        final SiteInner siteInner = functionApp.innerModel();
         final FunctionAppConfig flexConfig = getFlexConsumptionAppConfig();
+        final SiteInner siteInner = functionApp.innerModel();
         // clean up deprecated properties
         updateSiteConfigurations(functionApp, flexConfig);
-        siteInner.withReserved(null);
+
+        final FunctionAppConfig.Storage.Authentication authentication = Optional.of(flexConfig).map(FunctionAppConfig::getDeployment).map(FunctionAppConfig.FunctionsDeployment::getStorage)
+            .map(FunctionAppConfig.Storage::getAuthentication).orElse(null);
+        final boolean isManageIdentityAuthentication = Objects.nonNull(authentication) && authentication.getType() != StorageAuthenticationMethod.StorageAccountConnectionString;
+        if (isManageIdentityAuthentication) {
+            updateFlexFunctionAppIdentityConfiguration(functionApp, authentication);
+        }
+
         final SerializerAdapter adapter = SerializerFactory.createDefaultManagementSerializerAdapter();
         final String originContent = adapter.serializeRaw(siteInner);
         final ObjectNode jsonNode = adapter.deserialize(originContent, ObjectNode.class, SerializerEncoding.JSON);
@@ -395,7 +435,13 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
                 final String content = Objects.isNull(response) ? StringUtils.EMPTY : response.getBodyAsString().block();
                 throw new AzureToolkitRuntimeException(String.format("Failed to create or update function app : %s", content));
             }
-            return functionApp.manager().functionApps().getByResourceGroup(functionApp.resourceGroupName(), functionApp.name());
+            // get config from azure, so that we could get the new created managed identities info
+            final com.azure.resourcemanager.appservice.models.FunctionApp result =
+                functionApp.manager().functionApps().getByResourceGroup(functionApp.resourceGroupName(), functionApp.name());
+            if (isManageIdentityAuthentication) {
+                grantPermissionToIdentity(result);
+            }
+            return result;
         } catch (Throwable t) {
             throw new AzureToolkitRuntimeException(t);
         }
