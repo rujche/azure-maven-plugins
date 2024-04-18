@@ -401,9 +401,7 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         }
 
         public boolean sourceHasDockerFile() {
-            return Optional.ofNullable(buildImageConfig)
-                .map(BuildImageConfig::getSource).filter(Files::isDirectory)
-                .map(p -> Files.isRegularFile(Paths.get(p.toString(), "Dockerfile"))).orElse(false);
+            return Optional.ofNullable(buildImageConfig).map(BuildImageConfig::sourceHasDockerFile).orElse(false);
         }
     }
 
@@ -414,5 +412,11 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         @Nonnull
         private Path source;
         private Map<String, String> sourceBuildEnv;
+
+        public boolean sourceHasDockerFile() {
+            return Optional.of(source)
+                .filter(Files::isDirectory)
+                .map(p -> Files.isRegularFile(Paths.get(p.toString(), "Dockerfile"))).orElse(false);
+        }
     }
 }
