@@ -27,6 +27,8 @@ import com.microsoft.azure.toolkit.lib.containerapps.AzureContainerAppsServiceSu
 import com.microsoft.azure.toolkit.lib.containerapps.environment.ContainerAppsEnvironment;
 import com.microsoft.azure.toolkit.lib.containerapps.model.IngressConfig;
 import com.microsoft.azure.toolkit.lib.containerapps.model.RevisionMode;
+import com.microsoft.azure.toolkit.lib.containerregistry.AzureContainerRegistry;
+import com.microsoft.azure.toolkit.lib.containerregistry.ContainerRegistry;
 import com.microsoft.azure.toolkit.lib.servicelinker.ServiceLinkerConsumer;
 import com.microsoft.azure.toolkit.lib.servicelinker.ServiceLinkerModule;
 import lombok.Getter;
@@ -36,6 +38,7 @@ import org.apache.commons.lang3.StringUtils;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -103,6 +106,22 @@ public class ContainerApp extends AbstractAzResource<ContainerApp, AzureContaine
         return Optional.ofNullable(getRemote())
             .map(com.azure.resourcemanager.appcontainers.models.ContainerApp::configuration)
             .map(conf -> IngressConfig.fromIngress(conf.ingress())).orElse(null);
+    }
+
+    @Nullable
+    public ContainerAppDraft.ImageConfig getImageConfig(){
+        final Container container = this.getContainer();
+        if (Objects.nonNull(container)) {
+            final ContainerAppDraft.ImageConfig imageConfig = new ContainerAppDraft.ImageConfig(container.image());
+            final ContainerRegistry registry = Optional.ofNullable(imageConfig.getAcrRegistryName())
+                .flatMap(name -> Azure.az(AzureContainerRegistry.class).list().stream().flatMap(s -> s.registry().list().stream())
+                    .filter(r -> r.getName().equalsIgnoreCase(name)).findFirst())
+                .orElse(null);
+            imageConfig.setContainerRegistry(registry);
+            imageConfig.setEnvironmentVariables(Optional.ofNullable(container.env()).orElse(Collections.emptyList()));
+            return imageConfig;
+        }
+        return null;
     }
 
     @Nullable

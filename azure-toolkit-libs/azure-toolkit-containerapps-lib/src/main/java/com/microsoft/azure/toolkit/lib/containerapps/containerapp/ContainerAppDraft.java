@@ -308,6 +308,12 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         return Optional.ofNullable(config).map(Config::getIngressConfig).orElse(super.getIngressConfig());
     }
 
+    @Override
+    @Nullable
+    public ImageConfig getImageConfig() {
+        return Optional.ofNullable(config).map(Config::getImageConfig).orElse(super.getImageConfig());
+    }
+
     @Nullable
     public RevisionMode getRevisionMode() {
         return Optional.ofNullable(config).map(Config::getRevisionMode).orElse(super.getRevisionMode());
