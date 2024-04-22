@@ -40,6 +40,7 @@ import com.microsoft.azure.toolkit.lib.containerregistry.ContainerRegistryDraft;
 import com.microsoft.azure.toolkit.lib.containerregistry.model.Sku;
 import com.microsoft.azure.toolkit.lib.resource.ResourceGroup;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -97,7 +98,7 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         if (containerAppsEnvironment.isDraftForCreating()) {
             ((ContainerAppsEnvironmentDraft) containerAppsEnvironment).commit();
         }
-        final ImageConfig imageConfig = Objects.requireNonNull(ensureConfig().getImageConfig(), "Image is required to create Container app.");
+        final ImageConfig imageConfig = Objects.requireNonNull(this.getImageConfig(), "Image is required to create Container app.");
         buildImageIfNeeded(imageConfig);
         final Configuration configuration = new Configuration();
         Optional.ofNullable(ensureConfig().getRevisionMode()).ifPresent(mode ->
@@ -130,7 +131,7 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         final IngressConfig ingressConfig = config.getIngressConfig();
         final RevisionMode revisionMode = config.getRevisionMode();
 
-        final boolean isImageModified = Objects.nonNull(imageConfig);
+        final boolean isImageModified = Objects.nonNull(imageConfig) && !Objects.equals(imageConfig, super.getImageConfig());
         final boolean isIngressConfigModified = Objects.nonNull(ingressConfig) && !Objects.equals(ingressConfig, super.getIngressConfig());
         final boolean isRevisionModeModified = !Objects.equals(revisionMode, super.getRevisionMode());
         final boolean isModified = isImageModified || isIngressConfigModified || isRevisionModeModified;
@@ -138,8 +139,7 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
             return origin;
         }
         buildImageIfNeeded(imageConfig);
-        final ContainerAppImpl update =
-            (ContainerAppImpl) (isImageModified ? this.updateImage(origin) : origin.update());
+        final ContainerAppImpl update = (ContainerAppImpl) (isImageModified ? this.updateImage(origin) : origin.update());
         final Configuration configuration = update.configuration();
         if (!isImageModified) {
             // anytime you want to update the container app, you need to include the secrets but that is not retrieved by default
@@ -365,8 +365,10 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
 
     @Setter
     @Getter
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
     public static class ImageConfig {
         @Nonnull
+        @EqualsAndHashCode.Include
         private String fullImageName;
         @Nullable
         private ContainerRegistry containerRegistry;
