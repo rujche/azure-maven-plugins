@@ -163,7 +163,7 @@ public class ContainerAppsEnvironment extends AbstractAzResource<ContainerAppsEn
         final String token = getImageBuildAuthToken(build);
         final String uploadEndpoint = build.uploadEndpoint() + "?api-version=" + manager.serviceClient().getApiVersion();
         this.uploadFile(sourceTar, uploadEndpoint, token);
-        AzureMessager.getMessager().info("Source code is uploaded successfully.");
+        AzureMessager.getMessager().info("Artifact/compressed source code is uploaded successfully.");
         return build;
     }
 
@@ -177,7 +177,7 @@ public class ContainerAppsEnvironment extends AbstractAzResource<ContainerAppsEn
             "location", Optional.ofNullable(this.getRegion()).map(Region::getName).orElse(com.azure.core.management.Region.US_EAST.name()),
             "properties", Collections.emptyMap()
         );
-        AzureMessager.getMessager().progress(AzureString.format("Loading token for uploading compressed source code."));
+        AzureMessager.getMessager().progress(AzureString.format("Loading token for uploading artifact/compressed source code."));
         final HttpRequest tokenRequest = new HttpRequest(HttpMethod.POST, ImplUtils.createUrl(tokenEndpoint), new HttpHeaders(), BinaryData.fromObject(body));
         final HttpPipeline pipeline = manager.serviceClient().getHttpPipeline();
         try (final HttpResponse tokenResponse = pipeline.send(tokenRequest).block()) {
@@ -265,12 +265,12 @@ public class ContainerAppsEnvironment extends AbstractAzResource<ContainerAppsEn
                 final HttpEntity responseEntity = response.getEntity();
                 if (responseEntity != null) {
                     final String responseString = EntityUtils.toString(responseEntity);
-                    throw new AzureToolkitRuntimeException(String.format("Error when uploading source code, request exited with %s: %s", code, responseString));
+                    throw new AzureToolkitRuntimeException(String.format("Error when uploading artifact/source code, request exited with %s: %s", code, responseString));
                 }
-                throw new AzureToolkitRuntimeException(String.format("Error when uploading source code, request exited with %s", code));
+                throw new AzureToolkitRuntimeException(String.format("Error when uploading artifact/source code, request exited with %s", code));
             }
         } catch (final Exception e) {
-            throw new AzureToolkitRuntimeException("Error when uploading source code", e);
+            throw new AzureToolkitRuntimeException("Error when uploading artifact/source code", e);
         }
     }
 }

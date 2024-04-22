@@ -202,7 +202,11 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
             final RegistryTaskRun run = registry.buildImage(imageConfig.getAcrImageNameWithTag(), buildConfig.getSource());
             fullImageName = registry.waitForImageBuilding(run);
         } else {
-            AzureMessager.getMessager().warning("No Dockerfile detected. Building container image through Container Apps cloud build.");
+            if (Files.isDirectory(buildConfig.source)) {
+                AzureMessager.getMessager().warning("No Dockerfile detected. Building container image from source code through Container Apps cloud build.");
+            } else {
+                AzureMessager.getMessager().warning("Building container image from artifact through Container Apps cloud build.");
+            }
             final ContainerAppsEnvironment environment = Objects.requireNonNull(this.getManagedEnvironment());
             tarSourceIfNeeded(buildConfig);
             final BuildResource build = environment.buildImage(buildConfig.getSource(), buildConfig.sourceBuildEnv);
