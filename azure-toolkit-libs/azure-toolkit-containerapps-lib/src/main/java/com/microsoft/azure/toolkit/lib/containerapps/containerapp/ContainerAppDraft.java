@@ -13,6 +13,7 @@ import com.azure.resourcemanager.appcontainers.models.Container;
 import com.azure.resourcemanager.appcontainers.models.ContainerApps;
 import com.azure.resourcemanager.appcontainers.models.EnvironmentVar;
 import com.azure.resourcemanager.appcontainers.models.RegistryCredentials;
+import com.azure.resourcemanager.appcontainers.models.Scale;
 import com.azure.resourcemanager.appcontainers.models.Secret;
 import com.azure.resourcemanager.appcontainers.models.Template;
 import com.azure.resourcemanager.containerregistry.models.RegistryTaskRun;
@@ -39,6 +40,7 @@ import com.microsoft.azure.toolkit.lib.containerregistry.ContainerRegistry;
 import com.microsoft.azure.toolkit.lib.containerregistry.ContainerRegistryDraft;
 import com.microsoft.azure.toolkit.lib.containerregistry.model.Sku;
 import com.microsoft.azure.toolkit.lib.resource.ResourceGroup;
+import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -106,7 +108,9 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         configuration.withSecrets(Optional.ofNullable(getSecret(imageConfig)).map(Collections::singletonList).orElse(Collections.emptyList()));
         configuration.withRegistries(Optional.ofNullable(getRegistryCredential(imageConfig)).map(Collections::singletonList).orElse(Collections.emptyList()));
         configuration.withIngress(Optional.ofNullable(ensureConfig().getIngressConfig()).map(IngressConfig::toIngress).orElse(null));
-        final Template template = new Template().withContainers(getContainers(imageConfig));
+        final Template template = new Template()
+            .withContainers(ImageConfig.toContainers(imageConfig))
+            .withScale(ScaleConfig.toScale(this.getScaleConfig()));
         AzureMessager.getMessager().progress(AzureString.format("Creating Azure Container App({0})...", this.getName()));
         final com.azure.resourcemanager.appcontainers.models.ContainerApp result = client.define(ensureConfig().getName())
             .withRegion(com.azure.core.management.Region.fromName(ensureConfig().getRegion().getName()))
@@ -130,11 +134,13 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         final ImageConfig imageConfig = config.getImageConfig();
         final IngressConfig ingressConfig = config.getIngressConfig();
         final RevisionMode revisionMode = config.getRevisionMode();
+        final ScaleConfig scaleConfig = config.getScaleConfig();
 
         final boolean isImageModified = Objects.nonNull(imageConfig) && !Objects.equals(imageConfig, super.getImageConfig());
         final boolean isIngressConfigModified = Objects.nonNull(ingressConfig) && !Objects.equals(ingressConfig, super.getIngressConfig());
         final boolean isRevisionModeModified = !Objects.equals(revisionMode, super.getRevisionMode());
-        final boolean isModified = isImageModified || isIngressConfigModified || isRevisionModeModified;
+        final boolean isScaleModified = !Objects.equals(scaleConfig, super.getScaleConfig());
+        final boolean isModified = isImageModified || isIngressConfigModified || isRevisionModeModified || isScaleModified;
         if (!isModified) {
             return origin;
         }
@@ -152,6 +158,13 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         }
         if (isRevisionModeModified) {
             configuration.withActiveRevisionsMode(revisionMode.toActiveRevisionMode());
+        }
+        if (isScaleModified) {
+            if (isImageModified) {
+                update.withTemplate(update.template().withScale(ScaleConfig.toScale(scaleConfig)));
+            } else {
+                update.withTemplate(new Template().withScale(ScaleConfig.toScale(scaleConfig)));
+            }
         }
         update.withConfiguration(configuration);
         messager.progress(AzureString.format("Updating Container App({0})...", getName()));
@@ -185,7 +198,7 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
             .withRegistries(registries)
             .withSecrets(secrets));
         // drop old containers because we want to replace the old image
-        return update.withTemplate(origin.template().withContainers(getContainers(config)));
+        return update.withTemplate(origin.template().withContainers(ImageConfig.toContainers(config)));
     }
 
     public void buildImageIfNeeded(ImageConfig imageConfig) {
@@ -288,25 +301,19 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         return null;
     }
 
-    private static List<Container> getContainers(@Nonnull final ImageConfig config) {
-        final String imageId = config.getFullImageName();
-        final String containerName = getContainerNameForImage(imageId);
-        // drop old containers because we want to replace the old image
-        return Collections.singletonList(new Container().withName(containerName).withImage(imageId).withEnv(config.getEnvironmentVariables()));
-    }
-
-    private static String getContainerNameForImage(String containerImageName) {
-        final String name = containerImageName.substring(containerImageName.lastIndexOf('/') + 1).replaceAll("[^0-9a-zA-Z-]", "-").toLowerCase();
-        // The length of container name can not be more than 46.
-        return StringUtils.substring(name, 0, 46);
-    }
-
     @Nonnull
     private synchronized Config ensureConfig() {
         this.config = Optional.ofNullable(this.config).orElseGet(Config::new);
         return this.config;
     }
 
+    @Override
+    @Nullable
+    public ScaleConfig getScaleConfig() {
+        return Optional.ofNullable(config).map(Config::getScaleConfig).orElse(super.getScaleConfig());
+    }
+
+    @Override
     @Nullable
     public IngressConfig getIngressConfig() {
         return Optional.ofNullable(config).map(Config::getIngressConfig).orElse(super.getIngressConfig());
@@ -318,6 +325,7 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         return Optional.ofNullable(config).map(Config::getImageConfig).orElse(super.getImageConfig());
     }
 
+    @Override
     @Nullable
     public RevisionMode getRevisionMode() {
         return Optional.ofNullable(config).map(Config::getRevisionMode).orElse(super.getRevisionMode());
@@ -365,6 +373,8 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         private ImageConfig imageConfig;
         @Nullable
         private IngressConfig ingressConfig;
+        @Nullable
+        private ScaleConfig scaleConfig;
     }
 
     @Setter
@@ -409,6 +419,19 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         public boolean sourceHasDockerFile() {
             return Optional.ofNullable(buildImageConfig).map(BuildImageConfig::sourceHasDockerFile).orElse(false);
         }
+
+        public static List<Container> toContainers(@Nonnull final ImageConfig config) {
+            final String imageId = config.getFullImageName();
+            final String containerName = getContainerNameForImage(imageId);
+            // drop old containers because we want to replace the old image
+            return Collections.singletonList(new Container().withName(containerName).withImage(imageId).withEnv(config.getEnvironmentVariables()));
+        }
+
+        private static String getContainerNameForImage(String containerImageName) {
+            final String name = containerImageName.substring(containerImageName.lastIndexOf('/') + 1).replaceAll("[^0-9a-zA-Z-]", "-").toLowerCase();
+            // The length of container name can not be more than 46.
+            return StringUtils.substring(name, 0, 46);
+        }
     }
 
     @Getter
@@ -423,6 +446,21 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
             return Optional.of(source)
                 .filter(Files::isDirectory)
                 .map(p -> Files.isRegularFile(Paths.get(p.toString(), "Dockerfile"))).orElse(false);
+        }
+    }
+
+    @Getter
+    @Builder
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+    public static class ScaleConfig {
+        @EqualsAndHashCode.Include
+        private Integer maxReplicas;
+        @Builder.Default
+        @EqualsAndHashCode.Include
+        private Integer minReplicas = 1;
+
+        public static Scale toScale(ScaleConfig config) {
+            return Optional.ofNullable(config).map(s -> new Scale().withMinReplicas(s.minReplicas).withMaxReplicas(s.maxReplicas)).orElse(null);
         }
     }
 }

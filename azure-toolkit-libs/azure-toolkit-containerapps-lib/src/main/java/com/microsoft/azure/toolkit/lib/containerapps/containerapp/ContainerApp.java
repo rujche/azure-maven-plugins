@@ -102,6 +102,17 @@ public class ContainerApp extends AbstractAzResource<ContainerApp, AzureContaine
     }
 
     @Nullable
+    public ContainerAppDraft.ScaleConfig getScaleConfig() {
+        return Optional.ofNullable(getRemote())
+            .map(com.azure.resourcemanager.appcontainers.models.ContainerApp::template)
+            .map(Template::scale)
+            .map(scale -> ContainerAppDraft.ScaleConfig.builder()
+                .minReplicas(scale.minReplicas())
+                .maxReplicas(scale.maxReplicas())
+                .build()).orElse(null);
+    }
+
+    @Nullable
     public IngressConfig getIngressConfig() {
         return Optional.ofNullable(getRemote())
             .map(com.azure.resourcemanager.appcontainers.models.ContainerApp::configuration)
@@ -109,7 +120,7 @@ public class ContainerApp extends AbstractAzResource<ContainerApp, AzureContaine
     }
 
     @Nullable
-    public ContainerAppDraft.ImageConfig getImageConfig(){
+    public ContainerAppDraft.ImageConfig getImageConfig() {
         final Container container = this.getContainer();
         if (Objects.nonNull(container)) {
             final ContainerAppDraft.ImageConfig imageConfig = new ContainerAppDraft.ImageConfig(container.image());
