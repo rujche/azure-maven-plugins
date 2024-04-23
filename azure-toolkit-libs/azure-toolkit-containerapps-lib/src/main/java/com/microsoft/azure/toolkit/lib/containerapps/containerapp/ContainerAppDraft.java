@@ -113,7 +113,7 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
             .withScale(ScaleConfig.toScale(this.getScaleConfig()));
         AzureMessager.getMessager().progress(AzureString.format("Creating Azure Container App({0})...", this.getName()));
         final com.azure.resourcemanager.appcontainers.models.ContainerApp result = client.define(ensureConfig().getName())
-            .withRegion(com.azure.core.management.Region.fromName(ensureConfig().getRegion().getName()))
+            .withRegion(com.azure.core.management.Region.fromName(containerAppsEnvironment.getRegion().getName()))
             .withExistingResourceGroup(Objects.requireNonNull(ensureConfig().getResourceGroup(), "Resource Group is required to create Container app.").getResourceGroupName())
             .withManagedEnvironmentId(containerAppsEnvironment.getId())
             .withConfiguration(configuration)
@@ -346,7 +346,7 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
     @Nullable
     @Override
     public Region getRegion() {
-        return Optional.ofNullable(config).map(Config::getRegion).orElseGet(super::getRegion);
+        return Optional.ofNullable(config).map(Config::getEnvironment).map(ContainerAppsEnvironment::getRegion).orElseGet(super::getRegion);
     }
 
     @Override
@@ -365,7 +365,6 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         private String name;
         private Subscription subscription;
         private ResourceGroup resourceGroup;
-        private Region region;
         @Nullable
         private ContainerAppsEnvironment environment;
         private RevisionMode revisionMode = RevisionMode.SINGLE;
