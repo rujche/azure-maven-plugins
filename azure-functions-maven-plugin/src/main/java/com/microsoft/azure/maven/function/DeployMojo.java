@@ -18,11 +18,11 @@ import com.microsoft.azure.toolkit.lib.appservice.function.AzureFunctions;
 import com.microsoft.azure.toolkit.lib.appservice.function.FunctionApp;
 import com.microsoft.azure.toolkit.lib.appservice.function.FunctionAppBase;
 import com.microsoft.azure.toolkit.lib.appservice.model.FlexConsumptionConfiguration;
-import com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppLinuxRuntime;
 import com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppRuntime;
 import com.microsoft.azure.toolkit.lib.appservice.model.FunctionDeployType;
 import com.microsoft.azure.toolkit.lib.appservice.model.OperatingSystem;
 import com.microsoft.azure.toolkit.lib.appservice.model.PricingTier;
+import com.microsoft.azure.toolkit.lib.appservice.model.Runtime;
 import com.microsoft.azure.toolkit.lib.appservice.task.CreateOrUpdateFunctionAppTask;
 import com.microsoft.azure.toolkit.lib.appservice.task.DeployFunctionAppTask;
 import com.microsoft.azure.toolkit.lib.appservice.task.StreamingLogTask;
@@ -31,7 +31,6 @@ import com.microsoft.azure.toolkit.lib.common.messager.AzureMessager;
 import com.microsoft.azure.toolkit.lib.common.model.Region;
 import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
 import com.microsoft.azure.toolkit.lib.common.utils.Utils;
-import com.microsoft.azure.toolkit.lib.legacy.function.configurations.RuntimeConfiguration;
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
@@ -244,8 +243,7 @@ public class DeployMojo extends AbstractFunctionMojo {
         validateFunctionCompatibility();
         validateArtifactCompileVersion();
         validateApplicationInsightsConfiguration();
-        if (StringUtils.equalsAnyIgnoreCase(getPricingTier(),
-            PricingTier.FLEX_CONSUMPTION.getTier(), PricingTier.FLEX_CONSUMPTION.getSize())) {
+        if (Objects.equals(PricingTier.fromString(getPricingTier()), PricingTier.FLEX_CONSUMPTION)) {
             validateFlexConsumptionConfiguration();
         }
         // validate container apps hosting of function app
@@ -253,23 +251,21 @@ public class DeployMojo extends AbstractFunctionMojo {
 
     private void validateFlexConsumptionConfiguration() {
         // regions
+        final String subsId = this.getSubscriptionId();
+        final List<Region> regions = Azure.az(AzureAppService.class).forSubscription(subsId)
+            .functionApps().listRegions(PricingTier.FLEX_CONSUMPTION);
         final Region region = Optional.ofNullable(getRegion()).filter(StringUtils::isNotBlank).map(Region::fromName).orElse(null);
-        final String supportedRegions = FLEX_CONSUMPTION_REGIONS.stream().map(Region::getName).collect(Collectors.joining(", "));
-        if (Objects.nonNull(region) && !FLEX_CONSUMPTION_REGIONS.contains(region)) {
-            throw new AzureToolkitRuntimeException("`%s` is not a valid region for flex consumption app, supported values are %s", region.getName(), supportedRegions);
+        final String supportedRegionsValue = regions.stream().map(Region::getName).collect(Collectors.joining(","));
+        if (Objects.nonNull(region) && !regions.contains(region)) {
+            throw new AzureToolkitRuntimeException("`%s` is not a valid region for flex consumption app, supported values are %s", region.getName(), supportedRegionsValue);
         }
         // runtime
-        final RuntimeConfiguration runtimeConfiguration = this.getRuntimeConfiguration();
-        final OperatingSystem os = Optional.ofNullable(runtimeConfiguration).map(RuntimeConfiguration::getOs).map(OperatingSystem::fromString).orElse(null);
-        if (Objects.nonNull(os) && os != OperatingSystem.LINUX) {
-            throw new AzureToolkitRuntimeException("Flex consumption plan only supports Linux runtime");
-        }
-        // java version
-        final String javaVersion = Optional.ofNullable(runtimeConfiguration).map(RuntimeConfiguration::getJavaVersion).orElse(null);
-        final Integer javaMajorVersion = Optional.ofNullable(javaVersion).map(FunctionAppLinuxRuntime::fromJavaVersionUserText)
-            .map(FunctionAppLinuxRuntime::getJavaMajorVersionNumber).orElse(null);
-        if (Objects.nonNull(javaMajorVersion) && javaMajorVersion != 11 && javaMajorVersion != 17) {
-            throw new AzureToolkitRuntimeException("Flex consumption plan only supports Java 11 and Java 17");
+        final List<? extends FunctionAppRuntime> validFlexRuntimes = Objects.isNull(region) ? Collections.emptyList() :
+            Azure.az(AzureAppService.class).forSubscription(subsId).functionApps().listFlexConsumptionRuntimes(region);
+        final Runtime appRuntime = RuntimeConfig.toFunctionAppRuntime(getParser().getRuntimeConfig());
+        if (Objects.nonNull(region) && !validFlexRuntimes.contains(appRuntime)) {
+            final String validValues = validFlexRuntimes.stream().map(FunctionAppRuntime::getDisplayName).collect(Collectors.joining(","));
+            throw new AzureToolkitRuntimeException(String.format("Invalid runtime configuration, valid flex consumption runtimes are %s in region %s", validValues, region.getLabel()));
         }
         // scale configuration
         if (Objects.nonNull(instanceSize) && !VALID_CONTAINER_SIZE.contains(instanceSize)) {
