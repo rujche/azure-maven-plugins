@@ -33,8 +33,6 @@ import com.microsoft.azure.toolkit.lib.common.utils.StreamingLogSupport;
 import com.microsoft.azure.toolkit.lib.containerregistry.model.Sku;
 import lombok.Getter;
 import org.apache.commons.collections4.CollectionUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -47,7 +45,6 @@ import java.util.Optional;
 
 public class ContainerRegistry extends AbstractAzResource<ContainerRegistry, AzureContainerRegistryServiceSubscription, Registry> {
     public static final String ACR_IMAGE_SUFFIX = ".azurecr.io";
-    private static final Logger log = LoggerFactory.getLogger(ContainerRegistry.class);
     @Getter
     private final RepositoryModule repositoryModule;
 
@@ -185,7 +182,7 @@ public class ContainerRegistry extends AbstractAzResource<ContainerRegistry, Azu
         }
         final ImageDescriptor image = images.get(0);
         final String fullImageName = String.format("%s/%s:%s", image.registry(), image.repository(), image.tag());
-        AzureMessager.getMessager().info(AzureString.format("Image building task run %s is completed successfully, image %s is built.", run.runId(), fullImageName), viewLogInBrowser);
+        AzureMessager.getMessager().info(AzureString.format("Image building task run %s is completed successfully, image %s is built.", run.runId(), fullImageName), viewLogInToolkit, viewLogInBrowser);
         return fullImageName;
     }
 }

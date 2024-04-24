@@ -197,7 +197,7 @@ public class ContainerAppsEnvironment extends AbstractAzResource<ContainerAppsEn
         final UrlStreamingLog urlStreamingLog = UrlStreamingLog.builder()
             .authorization("Bearer " + getImageBuildAuthToken(build)).endpoint(build.logStreamEndpoint()).name(build.name()).build();
         final Action<StreamingLogSupport> viewLogInToolkit = AzureActionManager.getInstance().getAction(StreamingLogSupport.OPEN_STREAMING_LOG)
-            .bind(urlStreamingLog).withLabel("Open streaming logs in toolkit");
+            .bind(urlStreamingLog).withLabel("Open streaming logs");
         AzureMessager.getMessager().info(AzureString.format("Waiting for the build %s to be provisioned...", build.name()), viewLogInToolkit);
         BuildProvisioningState provisioningState = build.provisioningState();
         while (waitingProvisioningStates.contains(provisioningState)) {
