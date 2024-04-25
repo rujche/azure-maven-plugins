@@ -190,6 +190,8 @@ public class ContainerRegistry extends AbstractAzResource<ContainerRegistry, Azu
         final ImageDescriptor image = images.get(0);
         final String fullImageName = String.format("%s/%s:%s", image.registry(), image.repository(), image.tag());
         AzureMessager.getMessager().info(AzureString.format("Image building task run %s is completed successfully, image %s is built.", run.runId(), fullImageName), viewLogInBrowser);
+        // refresh to load newly build images.
+        this.refresh();
         return fullImageName;
     }
 }
