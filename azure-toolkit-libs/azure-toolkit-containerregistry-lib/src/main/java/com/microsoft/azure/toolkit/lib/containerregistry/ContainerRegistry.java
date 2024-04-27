@@ -192,6 +192,7 @@ public class ContainerRegistry extends AbstractAzResource<ContainerRegistry, Azu
         AzureMessager.getMessager().info(AzureString.format("Image building task run %s is completed successfully, image %s is built.", run.runId(), fullImageName), viewLogInBrowser);
         // refresh to load newly build images.
         this.refresh();
+        ResourceManagerUtils.sleep(Duration.ofSeconds(3));
         return fullImageName;
     }
 }
