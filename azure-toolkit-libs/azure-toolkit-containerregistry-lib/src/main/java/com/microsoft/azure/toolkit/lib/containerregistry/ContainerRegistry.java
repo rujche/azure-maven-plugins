@@ -24,6 +24,7 @@ import com.microsoft.azure.toolkit.lib.common.action.Action;
 import com.microsoft.azure.toolkit.lib.common.action.AzureActionManager;
 import com.microsoft.azure.toolkit.lib.common.bundle.AzureString;
 import com.microsoft.azure.toolkit.lib.common.exception.AzureToolkitRuntimeException;
+import com.microsoft.azure.toolkit.lib.common.exception.StreamingDiagnosticsException;
 import com.microsoft.azure.toolkit.lib.common.messager.AzureMessager;
 import com.microsoft.azure.toolkit.lib.common.model.AbstractAzResource;
 import com.microsoft.azure.toolkit.lib.common.model.AbstractAzResourceModule;
@@ -33,8 +34,6 @@ import com.microsoft.azure.toolkit.lib.common.utils.StreamingLogSupport;
 import com.microsoft.azure.toolkit.lib.containerregistry.model.Sku;
 import lombok.Getter;
 import org.apache.commons.collections4.CollectionUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -47,7 +46,6 @@ import java.util.Optional;
 
 public class ContainerRegistry extends AbstractAzResource<ContainerRegistry, AzureContainerRegistryServiceSubscription, Registry> {
     public static final String ACR_IMAGE_SUFFIX = ".azurecr.io";
-    private static final Logger log = LoggerFactory.getLogger(ContainerRegistry.class);
     @Getter
     private final RepositoryModule repositoryModule;
 
@@ -175,7 +173,7 @@ public class ContainerRegistry extends AbstractAzResource<ContainerRegistry, Azu
         final Action<String> viewLogInBrowser = openUrl.bind(logSasUrl).withLabel("Open streaming logs in browser");
         final RegistryTaskRunStreamingLog urlStreamingLog = RegistryTaskRunStreamingLog.builder().logSasUrl(logSasUrl).task(run).build();
         final Action<StreamingLogSupport> viewLogInToolkit = AzureActionManager.getInstance().getAction(StreamingLogSupport.OPEN_STREAMING_LOG)
-            .bind(urlStreamingLog).withLabel("Open streaming logs in toolkit");
+            .bind(urlStreamingLog).withLabel("Open streaming logs");
         AzureMessager.getMessager().info(AzureString.format("Waiting for image building task run (%s) to be completed...", run.runId()), viewLogInToolkit, viewLogInBrowser);
         RunStatus status = run.status();
         while (waitingStatus.contains(status)) {
@@ -185,11 +183,12 @@ public class ContainerRegistry extends AbstractAzResource<ContainerRegistry, Azu
         }
         final List<ImageDescriptor> images = run.innerModel().outputImages();
         if (errorStatus.contains(status) || CollectionUtils.isEmpty(images)) {
-            throw new AzureToolkitRuntimeException(String.format("Failed to build image (status: %s). View logs at %s for more details.", status, logSasUrl));
+            final String message = String.format("Failed to build image (status: %s). View logs at %s for more details.", status, logSasUrl);
+            throw new StreamingDiagnosticsException(message, urlStreamingLog);
         }
         final ImageDescriptor image = images.get(0);
         final String fullImageName = String.format("%s/%s:%s", image.registry(), image.repository(), image.tag());
-        AzureMessager.getMessager().info(AzureString.format("Image building task run %s is completed successfully, image %s is built.", run.runId(), fullImageName), viewLogInBrowser);
+        AzureMessager.getMessager().info(AzureString.format("Image building task run %s is completed successfully, image %s is built.", run.runId(), fullImageName), viewLogInToolkit, viewLogInBrowser);
         // refresh to load newly build images.
         this.refresh();
         ResourceManagerUtils.sleep(Duration.ofSeconds(3));
