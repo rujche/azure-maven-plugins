@@ -169,7 +169,7 @@ public class ContainerRegistry extends AbstractAzResource<ContainerRegistry, Azu
         final Action<String> viewLogInBrowser = openUrl.bind(logSasUrl).withLabel("Open streaming logs in browser");
         final RegistryTaskRunStreamingLog urlStreamingLog = RegistryTaskRunStreamingLog.builder().logSasUrl(logSasUrl).task(run).build();
         final Action<StreamingLogSupport> viewLogInToolkit = AzureActionManager.getInstance().getAction(StreamingLogSupport.OPEN_STREAMING_LOG)
-            .bind(urlStreamingLog).withLabel("Open streaming logs in toolkit");
+            .bind(urlStreamingLog).withLabel("Open streaming logs");
         AzureMessager.getMessager().info(AzureString.format("Waiting for image building task run (%s) to be completed...", run.runId()), viewLogInToolkit, viewLogInBrowser);
         RunStatus status = run.status();
         while (waitingStatus.contains(status)) {
