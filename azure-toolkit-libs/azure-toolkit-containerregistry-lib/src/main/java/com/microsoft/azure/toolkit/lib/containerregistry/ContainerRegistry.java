@@ -137,6 +137,10 @@ public class ContainerRegistry extends AbstractAzResource<ContainerRegistry, Azu
         return remoteOptional().map(Registry::type).orElse(null);
     }
 
+    /**
+     * @return image build task run, null if registry is not ready
+     */
+    @Nullable
     public RegistryTaskRun buildImage(final String imageNameWithTag, final Path sourceTar) {
         return this.remoteOptional().map(r -> {
             // upload tar.gz file
@@ -158,7 +162,7 @@ public class ContainerRegistry extends AbstractAzResource<ContainerRegistry, Azu
     }
 
     @Nullable
-    public String waitForImageBuilding(final RegistryTaskRun run) {
+    public String waitForImageBuilding(@Nonnull final RegistryTaskRun run) {
         final ImmutableSet<RunStatus> errorStatus = ImmutableSet.of(RunStatus.FAILED, RunStatus.CANCELED, RunStatus.ERROR, RunStatus.TIMEOUT);
         final ImmutableSet<RunStatus> waitingStatus = ImmutableSet.of(RunStatus.QUEUED, RunStatus.STARTED, RunStatus.RUNNING);
 
@@ -186,6 +190,9 @@ public class ContainerRegistry extends AbstractAzResource<ContainerRegistry, Azu
         final ImageDescriptor image = images.get(0);
         final String fullImageName = String.format("%s/%s:%s", image.registry(), image.repository(), image.tag());
         AzureMessager.getMessager().info(AzureString.format("Image building task run %s is completed successfully, image %s is built.", run.runId(), fullImageName), viewLogInBrowser);
+        // refresh to load newly build images.
+        this.refresh();
+        ResourceManagerUtils.sleep(Duration.ofSeconds(3));
         return fullImageName;
     }
 }
