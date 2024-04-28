@@ -129,7 +129,7 @@ public class ContainerAppsEnvironment extends AbstractAzResource<ContainerAppsEn
         if (Objects.isNull(remoteEnv)) {
             throw new AzureToolkitRuntimeException(AzureString.format("resource ({0}) not found", getName()).toString());
         }
-        final String baseUrl = String.format("https://%s.azurecontainerapps.dev", remoteEnv.location());
+        final String baseUrl = String.format("https://%s.azurecontainerapps.dev", Region.fromName(remoteEnv.location()).getName());
         return String.format("%s/subscriptions/%s/resourceGroups/%s/managedEnvironments/%s/eventstream",
             baseUrl, getSubscriptionId(), getResourceGroupName(), getName());
     }
