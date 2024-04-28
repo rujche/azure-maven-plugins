@@ -35,6 +35,7 @@ import com.microsoft.azure.toolkit.lib.common.action.Action;
 import com.microsoft.azure.toolkit.lib.common.action.AzureActionManager;
 import com.microsoft.azure.toolkit.lib.common.bundle.AzureString;
 import com.microsoft.azure.toolkit.lib.common.exception.AzureToolkitRuntimeException;
+import com.microsoft.azure.toolkit.lib.common.exception.StreamingDiagnosticsException;
 import com.microsoft.azure.toolkit.lib.common.messager.AzureMessager;
 import com.microsoft.azure.toolkit.lib.common.model.AbstractAzResource;
 import com.microsoft.azure.toolkit.lib.common.model.AbstractAzResourceModule;
@@ -220,7 +221,8 @@ public class ContainerAppsEnvironment extends AbstractAzResource<ContainerAppsEn
             buildStatus = build.buildStatus();
         }
         if (errorBuildingStates.contains(buildStatus)) {
-            throw new AzureToolkitRuntimeException(String.format("The build %s is provisioned properly but its build status is %s", build.name(), buildStatus));
+            final String message = String.format("The build %s is provisioned properly but its build status is %s", build.name(), buildStatus);
+            throw new StreamingDiagnosticsException(message, urlStreamingLog);
         }
         final String image = build.destinationContainerRegistry().image();
         AzureMessager.getMessager().info(AzureString.format("Build %s is completed successfully, image %s is built.", build.name(), image));

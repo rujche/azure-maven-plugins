@@ -24,6 +24,7 @@ import com.microsoft.azure.toolkit.lib.common.action.Action;
 import com.microsoft.azure.toolkit.lib.common.action.AzureActionManager;
 import com.microsoft.azure.toolkit.lib.common.bundle.AzureString;
 import com.microsoft.azure.toolkit.lib.common.exception.AzureToolkitRuntimeException;
+import com.microsoft.azure.toolkit.lib.common.exception.StreamingDiagnosticsException;
 import com.microsoft.azure.toolkit.lib.common.messager.AzureMessager;
 import com.microsoft.azure.toolkit.lib.common.model.AbstractAzResource;
 import com.microsoft.azure.toolkit.lib.common.model.AbstractAzResourceModule;
@@ -178,7 +179,8 @@ public class ContainerRegistry extends AbstractAzResource<ContainerRegistry, Azu
         }
         final List<ImageDescriptor> images = run.innerModel().outputImages();
         if (errorStatus.contains(status) || CollectionUtils.isEmpty(images)) {
-            throw new AzureToolkitRuntimeException(String.format("Failed to build image (status: %s). View logs at %s for more details.", status, logSasUrl));
+            final String message = String.format("Failed to build image (status: %s). View logs at %s for more details.", status, logSasUrl);
+            throw new StreamingDiagnosticsException(message, urlStreamingLog);
         }
         final ImageDescriptor image = images.get(0);
         final String fullImageName = String.format("%s/%s:%s", image.registry(), image.repository(), image.tag());
