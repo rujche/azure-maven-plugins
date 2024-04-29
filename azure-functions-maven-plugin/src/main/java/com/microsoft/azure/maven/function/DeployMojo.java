@@ -120,7 +120,7 @@ public class DeployMojo extends AbstractFunctionMojo {
     @JsonProperty
     @Getter
     @Parameter
-    protected Integer instanceSize;
+    protected Integer instanceMemory;
 
     /**
      * The maximum number of instances for the function app.
@@ -268,7 +268,7 @@ public class DeployMojo extends AbstractFunctionMojo {
             throw new AzureToolkitRuntimeException(String.format("Invalid runtime configuration, valid flex consumption runtimes are %s in region %s", validValues, region.getLabel()));
         }
         // scale configuration
-        if (Objects.nonNull(instanceSize) && !VALID_CONTAINER_SIZE.contains(instanceSize)) {
+        if (Objects.nonNull(instanceMemory) && !VALID_CONTAINER_SIZE.contains(instanceMemory)) {
             throw new AzureToolkitRuntimeException(String.format(CV2_INVALID_CONTAINER_SIZE, VALID_CONTAINER_SIZE.stream().map(String::valueOf).collect(Collectors.joining(","))));
         }
         if (Objects.nonNull(maximumInstances) && (maximumInstances > MAX_MAX_INSTANCES || maximumInstances < MIN_MAX_INSTANCES)){
