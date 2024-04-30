@@ -1,5 +1,6 @@
 package com.microsoft.azure.toolkit.lib.appservice.model;
 
+import com.microsoft.azure.toolkit.lib.common.exception.AzureToolkitRuntimeException;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -70,6 +71,31 @@ public class FunctionAppConfig {
             // Do not set a value for this property when using other authentication type.
             @Builder.Default
             private String storageAccountConnectionStringName = DEPLOYMENT_STORAGE_CONNECTION_STRING;
+
+            public static Authentication fromConfiguration(FlexConsumptionConfiguration configuration) {
+                switch (configuration.getAuthenticationMethod()) {
+                    case StorageAccountConnectionString:
+                        return Authentication.builder()
+                            .type(StorageAuthenticationMethod.StorageAccountConnectionString)
+                            .userAssignedIdentityResourceId(null)
+                            .storageAccountConnectionStringName(configuration.getStorageAccountConnectionString())
+                            .build();
+                    case UserAssignedIdentity:
+                        return Authentication.builder()
+                            .type(StorageAuthenticationMethod.UserAssignedIdentity)
+                            .userAssignedIdentityResourceId(configuration.getUserAssignedIdentityResourceId())
+                            .storageAccountConnectionStringName(null)
+                            .build();
+                    case SystemAssignedIdentity:
+                        return Authentication.builder()
+                            .type(StorageAuthenticationMethod.SystemAssignedIdentity)
+                            .userAssignedIdentityResourceId(null)
+                            .storageAccountConnectionStringName(null)
+                            .build();
+                    default:
+                        throw new AzureToolkitRuntimeException("Unsupported authentication method: " + configuration.getAuthenticationMethod());
+                }
+            }
         }
 
         public enum Type {

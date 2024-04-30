@@ -220,21 +220,23 @@ public abstract class FunctionAppBase<T extends FunctionAppBase<T, P, F>, P exte
 
     public FunctionAppConfig getFlexConsumptionAppConfig(){
         // todo: return null if not flex consumption
-        return Optional.ofNullable(getRemote()).map(remote -> {
-            final HttpPipeline httpPipeline = remote.manager().httpPipeline();
-            final String targetUrl = getRawRequestEndpoint(remote);
-            final HttpRequest request = new HttpRequest(HttpMethod.GET, targetUrl)
-                .setHeader(HttpHeaderName.CONTENT_TYPE, "application/json");
-            try (final HttpResponse block = httpPipeline.send(request).block()) {
-                final String content = Optional.ofNullable(block).map(HttpResponse::getBodyAsString).map(Mono::block).orElse(StringUtils.EMPTY);
-                final SerializerAdapter adapter = SerializerFactory.createDefaultManagementSerializerAdapter();
-                final ObjectNode functionNode = adapter.deserialize(content, ObjectNode.class, SerializerEncoding.JSON);
-                final JsonNode configNode = Optional.ofNullable(functionNode.get("properties")).map(propertiesNode -> propertiesNode.get("functionAppConfig")).orElse(null);
-                return Objects.isNull(configNode) ? (FunctionAppConfig) null : adapter.deserialize(configNode.toPrettyString(), FunctionAppConfig.class, SerializerEncoding.JSON);
-            } catch (Throwable t) {
-                return null;
-            }
-        }).orElse(null);
+        return Optional.ofNullable(getRemote()).map(this::getFlexConfigFromRemote).orElse(null);
+    }
+
+    protected FunctionAppConfig getFlexConfigFromRemote(@Nonnull final WebAppBase remote) {
+        final HttpPipeline httpPipeline = remote.manager().httpPipeline();
+        final String targetUrl = getRawRequestEndpoint(remote);
+        final HttpRequest request = new HttpRequest(HttpMethod.GET, targetUrl)
+            .setHeader(HttpHeaderName.CONTENT_TYPE, "application/json");
+        try (final HttpResponse block = httpPipeline.send(request).block()) {
+            final String content = Optional.ofNullable(block).map(HttpResponse::getBodyAsString).map(Mono::block).orElse(StringUtils.EMPTY);
+            final SerializerAdapter adapter = SerializerFactory.createDefaultManagementSerializerAdapter();
+            final ObjectNode functionNode = adapter.deserialize(content, ObjectNode.class, SerializerEncoding.JSON);
+            final JsonNode configNode = Optional.ofNullable(functionNode.get("properties")).map(propertiesNode -> propertiesNode.get("functionAppConfig")).orElse(null);
+            return Objects.isNull(configNode) ? null : adapter.deserialize(configNode.toPrettyString(), FunctionAppConfig.class, SerializerEncoding.JSON);
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     public String getRawRequestEndpoint(@Nonnull com.azure.resourcemanager.appservice.models.WebAppBase functionApp) {

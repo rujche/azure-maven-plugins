@@ -25,6 +25,7 @@ import com.azure.resourcemanager.appservice.models.NameValuePair;
 import com.azure.resourcemanager.appservice.models.UserAssignedIdentity;
 import com.azure.resourcemanager.authorization.AuthorizationManager;
 import com.azure.resourcemanager.authorization.models.BuiltInRole;
+import com.azure.resourcemanager.authorization.models.RoleAssignment;
 import com.azure.resourcemanager.msi.MsiManager;
 import com.azure.resourcemanager.msi.models.Identity;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -96,6 +97,7 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
     public static final String APPLICATIONINSIGHTS_ENABLE_AGENT = "APPLICATIONINSIGHTS_ENABLE_AGENT";
     public static final String SERVICE_PLAN_MISSING_MESSAGE = "'service plan' is required to create a Function App";
     public static final String UNSUPPORTED_OPERATING_SYSTEM_FOR_CONTAINER_APP = "Unsupported operating system %s for function app on container app";
+    public static final String STORAGE_BLOB_DATA_CONTRIBUTOR_ROLE_ID = "ba92f5b4-2d11-453d-a403-e96b0029c9fe";
 
     @Getter
     @Nullable
@@ -258,7 +260,7 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
     }
 
     private void grantPermissionToIdentity(final com.azure.resourcemanager.appservice.models.FunctionApp result) {
-        final FunctionAppConfig config = super.getFlexConsumptionAppConfig();
+        final FunctionAppConfig config = getFlexConfigFromRemote(result);
         final FunctionAppConfig.Storage storage = config.getDeployment().getStorage();
         final FunctionAppConfig.Storage.Authentication authConfiguration = Objects.requireNonNull(storage.getAuthentication());
         final StorageAccount storageAccount = Optional.ofNullable(ensureConfig().getDeploymentAccount())
@@ -275,10 +277,18 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
                 .map(UserAssignedIdentity::principalId).orElseThrow(()-> new RuntimeException("User assigned identity not found"));
         final String roleAssignmentName = UUID.randomUUID().toString();
         final AuthorizationManager authorizationManager = Objects.requireNonNull(this.getParent().getRemote()).authorizationManager();
-        authorizationManager.roleAssignments().define(roleAssignmentName)
-            .forObjectId(identityId)
-            .withBuiltInRole(BuiltInRole.STORAGE_BLOB_DATA_CONTRIBUTOR)
-            .withScope(storageAccount.getId()).create();
+        final String roleDefinitionId = String.format("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", getSubscriptionId(), STORAGE_BLOB_DATA_CONTRIBUTOR_ROLE_ID);
+        final RoleAssignment existingAssignment = authorizationManager.roleAssignments()
+            .listByScope(storageAccount.getId()).stream()
+            .filter(assignment -> StringUtils.equalsIgnoreCase(assignment.principalId(), identityId) &&
+                StringUtils.equalsIgnoreCase(assignment.roleDefinitionId(), roleDefinitionId))
+            .findFirst().orElse(null);
+        if (Objects.isNull(existingAssignment)) {
+            authorizationManager.roleAssignments().define(roleAssignmentName)
+                .forObjectId(identityId)
+                .withBuiltInRole(BuiltInRole.STORAGE_BLOB_DATA_CONTRIBUTOR)
+                .withScope(storageAccount.getId()).create();
+        } // ba92f5b4-2d11-453d-a403-e96b0029c9fe
     }
 
     private boolean shouldEnableDistributedTracing(@Nullable final AppServicePlan servicePlan, @Nullable final Map<String, String> appSettings) {
@@ -506,10 +516,8 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
         }
         // Create FunctionsDeployment.Storage.Authentication
         final StorageAuthenticationMethod authenticationMethod = Optional.ofNullable(configuration.getAuthenticationMethod()).orElse(StorageAuthenticationMethod.StorageAccountConnectionString);
-        final com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.Storage.Authentication authentication = com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.Storage.Authentication.builder()
-            .type(authenticationMethod)
-            .userAssignedIdentityResourceId(configuration.getUserAssignedIdentityResourceId())
-            .storageAccountConnectionStringName(configuration.getStorageAccountConnectionString()).build();
+        final com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.Storage.Authentication authentication =
+            com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.Storage.Authentication.fromConfiguration(configuration);
         final BlobContainer deploymentContainer = ensureConfig().getDeploymentContainer();
         final com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.Storage storage =
             com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.Storage.builder().authentication(authentication).value(deploymentContainer.getUrl()).build();
