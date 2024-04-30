@@ -29,6 +29,7 @@ import com.microsoft.azure.toolkit.lib.common.model.AzResource;
 import com.microsoft.azure.toolkit.lib.common.model.Region;
 import com.microsoft.azure.toolkit.lib.common.model.Subscription;
 import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
+import com.microsoft.azure.toolkit.lib.common.operation.OperationContext;
 import com.microsoft.azure.toolkit.lib.common.task.AzureTaskManager;
 import com.microsoft.azure.toolkit.lib.common.utils.Utils;
 import com.microsoft.azure.toolkit.lib.containerapps.environment.ContainerAppsEnvironment;
@@ -204,8 +205,11 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
 
     public void buildImageIfNeeded(ImageConfig imageConfig) {
         if (!Optional.ofNullable(imageConfig).map(ImageConfig::getBuildImageConfig).map(b -> b.source).filter(Files::exists).isPresent()) {
+            OperationContext.action().setTelemetryProperty("needBuildImage", "false");
             return;
         }
+        OperationContext.action().setTelemetryProperty("needBuildImage", "true");
+        OperationContext.action().setTelemetryProperty("hasDockerFile", String.valueOf(imageConfig.sourceHasDockerFile()));
         final BuildImageConfig buildConfig = Objects.requireNonNull(imageConfig.getBuildImageConfig());
         final String fullImageName;
         if (imageConfig.sourceHasDockerFile()) {
@@ -219,6 +223,7 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
             }
             fullImageName = registry.waitForImageBuilding(run);
         } else {
+            OperationContext.action().setTelemetryProperty("isDirectory", String.valueOf(Files.isDirectory(buildConfig.source)));
             if (Files.isDirectory(buildConfig.source)) {
                 AzureMessager.getMessager().warning("No Dockerfile detected. Building container image from source code through Container Apps cloud build.");
             } else {
