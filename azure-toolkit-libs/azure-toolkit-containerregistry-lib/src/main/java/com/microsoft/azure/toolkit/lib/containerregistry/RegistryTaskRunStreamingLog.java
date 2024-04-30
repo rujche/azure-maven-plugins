@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 public class RegistryTaskRunStreamingLog implements StreamingLogSupport {
     private static final int MAX_RETRY = 8;
     private static final int RETRY_INTERVAL = 1000;
+    private static final int WAIT_INTERVAL = 200;
 
     private RegistryTaskRun task;
     private String logSasUrl;
@@ -57,12 +58,13 @@ public class RegistryTaskRunStreamingLog implements StreamingLogSupport {
                     final String newContent = readFromUrl(logSasUrl);
                     if (StringUtils.equals(newContent, content)) {
                         i++;
+                        Thread.sleep(RETRY_INTERVAL);
                         continue;
                     }
                     Arrays.stream(StringUtils.removeStart(newContent, content).split("\n")).forEach(sink::next);
                     content = newContent;
                     i = 0; // reset retry count if there are new content
-                    Thread.sleep(RETRY_INTERVAL);
+                    Thread.sleep(WAIT_INTERVAL);
                 }
             } catch (final Exception e) {
                 sink.error(e);
