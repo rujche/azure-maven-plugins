@@ -22,6 +22,7 @@ import com.microsoft.azure.toolkit.lib.Azure;
 import com.microsoft.azure.toolkit.lib.common.action.Action;
 import com.microsoft.azure.toolkit.lib.common.action.AzureActionManager;
 import com.microsoft.azure.toolkit.lib.common.bundle.AzureString;
+import com.microsoft.azure.toolkit.lib.common.exception.AzureToolkitRuntimeException;
 import com.microsoft.azure.toolkit.lib.common.messager.AzureMessager;
 import com.microsoft.azure.toolkit.lib.common.messager.IAzureMessager;
 import com.microsoft.azure.toolkit.lib.common.model.AzResource;
@@ -213,6 +214,9 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
             final ContainerRegistry registry = getOrCreateRegistry(imageConfig);
             tarSourceIfNeeded(buildConfig);
             final RegistryTaskRun run = registry.buildImage(imageConfig.getAcrImageNameWithTag(), buildConfig.getSource());
+            if (Objects.isNull(run)) {
+                throw new AzureToolkitRuntimeException("ACR is not ready, Failed to build image through ACR.");
+            }
             fullImageName = registry.waitForImageBuilding(run);
         } else {
             if (Files.isDirectory(buildConfig.source)) {
@@ -268,7 +272,10 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
                 }
             }
         }
-        if (!registry.isAdminUserEnabled()) {// enable admin user
+        if (registry.isDraftForCreating()) {
+            ((ContainerRegistryDraft) registry).setAdminUserEnabled(true);
+            ((ContainerRegistryDraft) registry).commit();
+        } else if (!registry.isAdminUserEnabled()) {// enable admin user
             AzureMessager.getMessager().info(AzureString.format("Enabling admin user for container registry %s.", registry.getName()));
             registry.enableAdminUser();
         }

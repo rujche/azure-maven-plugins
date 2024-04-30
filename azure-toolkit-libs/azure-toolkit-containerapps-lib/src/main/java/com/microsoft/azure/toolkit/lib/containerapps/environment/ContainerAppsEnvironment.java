@@ -35,6 +35,7 @@ import com.microsoft.azure.toolkit.lib.common.action.Action;
 import com.microsoft.azure.toolkit.lib.common.action.AzureActionManager;
 import com.microsoft.azure.toolkit.lib.common.bundle.AzureString;
 import com.microsoft.azure.toolkit.lib.common.exception.AzureToolkitRuntimeException;
+import com.microsoft.azure.toolkit.lib.common.exception.StreamingDiagnosticsException;
 import com.microsoft.azure.toolkit.lib.common.messager.AzureMessager;
 import com.microsoft.azure.toolkit.lib.common.model.AbstractAzResource;
 import com.microsoft.azure.toolkit.lib.common.model.AbstractAzResourceModule;
@@ -128,7 +129,7 @@ public class ContainerAppsEnvironment extends AbstractAzResource<ContainerAppsEn
         if (Objects.isNull(remoteEnv)) {
             throw new AzureToolkitRuntimeException(AzureString.format("resource ({0}) not found", getName()).toString());
         }
-        final String baseUrl = String.format("https://%s.azurecontainerapps.dev", remoteEnv.location());
+        final String baseUrl = String.format("https://%s.azurecontainerapps.dev", Region.fromName(remoteEnv.location()).getName());
         return String.format("%s/subscriptions/%s/resourceGroups/%s/managedEnvironments/%s/eventstream",
             baseUrl, getSubscriptionId(), getResourceGroupName(), getName());
     }
@@ -197,7 +198,7 @@ public class ContainerAppsEnvironment extends AbstractAzResource<ContainerAppsEn
         final UrlStreamingLog urlStreamingLog = UrlStreamingLog.builder()
             .authorization("Bearer " + getImageBuildAuthToken(build)).endpoint(build.logStreamEndpoint()).name(build.name()).build();
         final Action<StreamingLogSupport> viewLogInToolkit = AzureActionManager.getInstance().getAction(StreamingLogSupport.OPEN_STREAMING_LOG)
-            .bind(urlStreamingLog).withLabel("Open streaming logs in toolkit");
+            .bind(urlStreamingLog).withLabel("Open streaming logs");
         AzureMessager.getMessager().info(AzureString.format("Waiting for the build %s to be provisioned...", build.name()), viewLogInToolkit);
         BuildProvisioningState provisioningState = build.provisioningState();
         while (waitingProvisioningStates.contains(provisioningState)) {
@@ -220,7 +221,8 @@ public class ContainerAppsEnvironment extends AbstractAzResource<ContainerAppsEn
             buildStatus = build.buildStatus();
         }
         if (errorBuildingStates.contains(buildStatus)) {
-            throw new AzureToolkitRuntimeException(String.format("The build %s is provisioned properly but its build status is %s", build.name(), buildStatus));
+            final String message = String.format("The build %s is provisioned properly but its build status is %s", build.name(), buildStatus);
+            throw new StreamingDiagnosticsException(message, urlStreamingLog);
         }
         final String image = build.destinationContainerRegistry().image();
         AzureMessager.getMessager().info(AzureString.format("Build %s is completed successfully, image %s is built.", build.name(), image));
