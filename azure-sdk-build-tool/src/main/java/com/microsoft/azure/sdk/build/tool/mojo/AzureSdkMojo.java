@@ -53,27 +53,60 @@ public class AzureSdkMojo extends AbstractMojo {
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
     private MavenProject project;
 
+    /**
+     * Ensures that the build has the azure-sdk-for-java BOM referenced appropriately, so that Azure SDK for Java client library dependencies may take
+     * their versions from the BOM. This is set to {@code true}, by default.
+     */
     @Parameter(property = "validateAzureSdkBomUsed", defaultValue = "true")
     private boolean validateAzureSdkBomUsed;
 
+    /**
+     * Ensures that the project does not make use of previous-generation Azure libraries. Using the new and previous-generation libraries in a
+     * single project is unlikely to cause any issue, but is will result in a sub-optimal developer experience.
+     * This is set to {@code true}, by default.
+     */
     @Parameter(property = "validateNoDeprecatedMicrosoftLibraryUsed", defaultValue = "true")
     private boolean validateNoDeprecatedMicrosoftLibraryUsed;
 
+    /**
+     * Ensures that where a dependency is available from the azure-sdk-for-java BOM the version is not being manually overridden.
+     * This is set to {@code true}, by default.
+     */
     @Parameter(property = "validateBomVersionsAreUsed", defaultValue = "true")
     private boolean validateBomVersionsAreUsed;
 
+    /**
+     * Some Azure SDK for Java client libraries have beta releases, with version strings in the form x.y.z-beta.n. Enabling this feature will ensure
+     * that no beta libraries are being used. This is set to {@code true}, by default.
+     */
     @Parameter(property = "validateNoBetaLibraryUsed", defaultValue = "true")
     private boolean validateNoBetaLibraryUsed;
 
+    /**
+     * Azure SDK for Java client libraries sometimes do GA releases with methods annotated with @Beta. This check looks to see if any such
+     * methods are being used. This is set to {@code true}, by default.
+     */
     @Parameter(property = "validateNoBetaApiUsed", defaultValue = "true")
     private boolean validateNoBetaApiUsed;
 
+    /**
+     * Ensures that dependencies are kept up to date by reporting back (or failing the build) if a newer azure-sdk-for-java BOM exists.
+     * This is set to {@code true}, by default.
+     */
     @Parameter(property = "validateLatestBomVersionUsed", defaultValue = "true")
     private boolean validateLatestBomVersionUsed;
 
+    /**
+     *(Optional) Specifies the location to write the build report out to, in JSON format. If not specified, no report will be written
+     * (and a summary of the build, or the appropriate build failures), will be shown in the terminal.
+     */
     @Parameter(property = "reportFile", defaultValue = "")
     private String reportFile;
 
+    /**
+     * (Optional) The build report is sent to Microsoft Application Insights for collecting usability metrics. To disable sending the report to Microsoft,
+     * set this to false.
+     */
     @Parameter(property = "sendToMicrosoft", defaultValue = "true")
     private boolean sendToMicrosoft;
 
@@ -153,6 +186,8 @@ public class AzureSdkMojo extends AbstractMojo {
             List<TelemetryItem> telemetryItems = new ArrayList<>();
             telemetryItems.add(telemetryItem);
             applicationInsightsClient.trackAsync(telemetryItems).block();
+            getLog().info("The build report was successfully sent to Azure Application Insights. "
+                + "To disable sending the report, set the 'sendToMicrosoft' configuration property to false");
         } catch (Exception ex) {
             getLog().warn("Unable to send report to Application Insights. " + ex.getMessage());
         }
