@@ -23,6 +23,7 @@ import com.microsoft.azure.toolkit.lib.appservice.model.FunctionDeployType;
 import com.microsoft.azure.toolkit.lib.appservice.model.OperatingSystem;
 import com.microsoft.azure.toolkit.lib.appservice.model.PricingTier;
 import com.microsoft.azure.toolkit.lib.appservice.model.Runtime;
+import com.microsoft.azure.toolkit.lib.appservice.model.StorageAuthenticationMethod;
 import com.microsoft.azure.toolkit.lib.appservice.task.CreateOrUpdateFunctionAppTask;
 import com.microsoft.azure.toolkit.lib.appservice.task.DeployFunctionAppTask;
 import com.microsoft.azure.toolkit.lib.appservice.task.StreamingLogTask;
@@ -266,6 +267,23 @@ public class DeployMojo extends AbstractFunctionMojo {
         if (Objects.nonNull(region) && !validFlexRuntimes.contains(appRuntime)) {
             final String validValues = validFlexRuntimes.stream().map(FunctionAppRuntime::getDisplayName).collect(Collectors.joining(","));
             throw new AzureToolkitRuntimeException(String.format("Invalid runtime configuration, valid flex consumption runtimes are %s in region %s", validValues, region.getLabel()));
+        }
+        // storage authentication method
+        final StorageAuthenticationMethod authenticationMethod = Optional.ofNullable(storageAuthenticationMethod)
+            .map(StorageAuthenticationMethod::fromString)
+            .orElse(null);
+        if (Objects.nonNull(authenticationMethod)) {
+            if (StringUtils.isNotBlank(storageAccountConnectionString) &&
+                authenticationMethod != StorageAuthenticationMethod.StorageAccountConnectionString) {
+                AzureMessager.getMessager().warning("The value of <storageAccountConnectionString> will be ignored because the value of <storageAuthenticationMethod> is not StorageAccountConnectionString");
+            }
+            if (StringUtils.isNotBlank(userAssignedIdentityResourceId) &&
+                authenticationMethod != StorageAuthenticationMethod.UserAssignedIdentity) {
+                AzureMessager.getMessager().warning("The value of <userAssignedIdentityResourceId> will be ignored because the value of <storageAuthenticationMethod> is not UserAssignedIdentity");
+            }
+            if (StringUtils.isBlank(userAssignedIdentityResourceId) && authenticationMethod == StorageAuthenticationMethod.UserAssignedIdentity) {
+                throw new AzureToolkitRuntimeException("Please specify the value of <userAssignedIdentityResourceId> when the value of <storageAuthenticationMethod> is UserAssignedIdentity");
+            }
         }
         // scale configuration
         if (Objects.nonNull(instanceMemory) && !VALID_CONTAINER_SIZE.contains(instanceMemory)) {
