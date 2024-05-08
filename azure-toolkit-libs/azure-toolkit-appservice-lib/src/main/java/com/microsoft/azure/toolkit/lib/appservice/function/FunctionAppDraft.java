@@ -397,6 +397,12 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
     }
 
     private boolean isFlexConsumptionModified(final FlexConsumptionConfiguration oldConfiguration, final FlexConsumptionConfiguration newConfiguration) {
+        if (Objects.isNull(newConfiguration)) {
+            return false;
+        }
+        if (Objects.isNull(oldConfiguration)) {
+            return true;
+        }
         return (Objects.nonNull(newConfiguration.getInstanceSize()) && !Objects.equals(oldConfiguration.getInstanceSize(), newConfiguration.getInstanceSize())) ||
             (Objects.nonNull(newConfiguration.getMaximumInstances()) && !Objects.equals(oldConfiguration.getMaximumInstances(), newConfiguration.getMaximumInstances())) ||
             (Objects.nonNull(newConfiguration.getAlwaysReadyInstances()) && !Arrays.equals(oldConfiguration.getAlwaysReadyInstances(), newConfiguration.getAlwaysReadyInstances())) ||
@@ -448,6 +454,8 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
             // get config from azure, so that we could get the new created managed identities info
             final com.azure.resourcemanager.appservice.models.FunctionApp result =
                 functionApp.manager().functionApps().getByResourceGroup(functionApp.resourceGroupName(), functionApp.name());
+            // workaround to avoid identity properties is not updated
+            result.refresh();
             if (isManageIdentityAuthentication) {
                 grantPermissionToIdentity(result);
             }
