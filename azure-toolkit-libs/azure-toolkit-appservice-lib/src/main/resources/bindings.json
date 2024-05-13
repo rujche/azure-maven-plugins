@@ -92,7 +92,7 @@
       ]
     },
     {
-      "type": "blobTrigger",
+      "type": "eventGridBlobTrigger",
       "displayName": "$eventGridBlobTrigger_displayName",
       "direction": "trigger",
       "enabledInTryMode": true,
