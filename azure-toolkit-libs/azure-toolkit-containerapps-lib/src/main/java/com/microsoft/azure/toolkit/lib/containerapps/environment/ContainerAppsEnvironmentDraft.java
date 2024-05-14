@@ -64,8 +64,8 @@ public class ContainerAppsEnvironmentDraft extends ContainerAppsEnvironment impl
         final AppLogsConfiguration appLogsConfiguration = new AppLogsConfiguration();
         final LogAnalyticsWorkspace logAnalyticsWorkspace = config.getLogAnalyticsWorkspace();
         if (Objects.nonNull(logAnalyticsWorkspace)) {
-            if (logAnalyticsWorkspace.isDraftForCreating() && !logAnalyticsWorkspace.exists()) {
-                ((LogAnalyticsWorkspaceDraft) logAnalyticsWorkspace).commit();
+            if (logAnalyticsWorkspace.isDraftForCreating()) {
+                ((LogAnalyticsWorkspaceDraft) logAnalyticsWorkspace).createIfNotExist();
             }
             final LogAnalyticsConfiguration analyticsConfiguration = new LogAnalyticsConfiguration()
                     .withCustomerId(logAnalyticsWorkspace.getCustomerId())
