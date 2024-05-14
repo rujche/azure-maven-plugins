@@ -519,33 +519,32 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
     @Override
     public FunctionAppConfig getFlexConsumptionAppConfig() {
         final FlexConsumptionConfiguration configuration = ensureConfig().getFlexConsumptionConfiguration();
+        final FunctionAppConfig original = super.getFlexConsumptionAppConfig();
         if (Objects.isNull(configuration)) {
-            return super.getFlexConsumptionAppConfig();
+            return original;
         }
+        final FunctionAppConfig result = this.isDraftForCreating() ? new FunctionAppConfig() : original;
+        final FunctionAppConfig.FunctionsDeployment deployment = Optional.ofNullable(result.getDeployment()).orElseGet(FunctionAppConfig.FunctionsDeployment::new);
+        final FunctionAppConfig.Storage storage = Optional.ofNullable(deployment.getStorage()).orElseGet(FunctionAppConfig.Storage::new);
         // Create FunctionsDeployment.Storage.Authentication
-        final StorageAuthenticationMethod authenticationMethod = Optional.ofNullable(configuration.getAuthenticationMethod()).orElse(StorageAuthenticationMethod.StorageAccountConnectionString);
-        final com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.Storage.Authentication authentication =
-            com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.Storage.Authentication.fromConfiguration(configuration);
-        final BlobContainer deploymentContainer = ensureConfig().getDeploymentContainer();
-        final com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.Storage storage =
-            com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.Storage.builder().authentication(authentication).value(deploymentContainer.getUrl()).build();
-        final com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.FunctionsDeployment deployment =
-            com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.FunctionsDeployment.builder().storage(storage).build();
+        Optional.ofNullable(FunctionAppConfig.Storage.Authentication.fromConfiguration(configuration)).ifPresent(storage::setAuthentication);
+        Optional.ofNullable(ensureConfig().getDeploymentContainer()).map(BlobContainer::getUrl).ifPresent(storage::setValue);
+        deployment.setStorage(storage);
+        result.setDeployment(deployment);
         // Create FunctionsRuntime
-        final com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.FunctionsRuntime runtime =
-            com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.FunctionsRuntime.builder().version(ensureConfig().getRuntime().getJavaVersionNumber()).build();
+        final FunctionAppConfig.FunctionsRuntime functionsRuntime = Optional.ofNullable(result.getRuntime()).orElseGet(FunctionAppConfig.FunctionsRuntime::new);
+        Optional.ofNullable(ensureConfig().getRuntime()).map(FunctionAppRuntime::getJavaVersionNumber).ifPresent(functionsRuntime::setVersion);
+        result.setRuntime(functionsRuntime);
         // Create FunctionScaleAndConcurrency
         // todo: support other trigger concurrency settings
-        final FunctionAppConfig.FunctionTriggers triggers = Optional.ofNullable(configuration.getHttpInstanceConcurrency()).map(FunctionAppConfig.FunctionTriggers::new).orElse(null);
-        final com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.FunctionScaleAndConcurrency scaleAndConcurrency =
-            com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.FunctionScaleAndConcurrency.builder()
-                .maximumInstanceCount(configuration.getMaximumInstances())
-                .instanceMemoryMB(configuration.getInstanceSize())
-                .alwaysReady(configuration.getAlwaysReadyInstances())
-                .triggers(triggers)
-                .build();
-        return com.microsoft.azure.toolkit.lib.appservice.model.FunctionAppConfig.builder()
-            .deployment(deployment).scaleAndConcurrency(scaleAndConcurrency).runtime(runtime).build();
+        final FunctionAppConfig.FunctionScaleAndConcurrency concurrency = Optional.ofNullable(result.getScaleAndConcurrency())
+            .orElseGet(FunctionAppConfig.FunctionScaleAndConcurrency::new);
+        Optional.ofNullable(configuration.getHttpInstanceConcurrency()).map(FunctionAppConfig.FunctionTriggers::new).ifPresent(concurrency::setTriggers);
+        Optional.ofNullable(configuration.getInstanceSize()).ifPresent(concurrency::setInstanceMemoryMB);
+        Optional.ofNullable(configuration.getMaximumInstances()).ifPresent(concurrency::setMaximumInstanceCount);
+        Optional.ofNullable(configuration.getAlwaysReadyInstances()).ifPresent(concurrency::setAlwaysReady);
+        result.setScaleAndConcurrency(concurrency);
+        return result;
     }
 
     private void updateAppServicePlan(@Nonnull Update update, @Nonnull AppServicePlan newPlan) {
