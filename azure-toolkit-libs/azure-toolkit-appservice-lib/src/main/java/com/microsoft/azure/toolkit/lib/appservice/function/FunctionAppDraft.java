@@ -255,7 +255,6 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
             app.innerModel().withIdentity(new ManagedServiceIdentity()
                 .withType(ManagedServiceIdentityType.USER_ASSIGNED)
                 .withUserAssignedIdentities(Collections.singletonMap(identity.id(), userAssignedIdentity)));
-            // update.withUserAssignedManagedServiceIdentity().withExistingUserAssignedManagedServiceIdentity(identity);
         }
     }
 
@@ -284,10 +283,16 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
                 StringUtils.equalsIgnoreCase(assignment.roleDefinitionId(), roleDefinitionId))
             .findFirst().orElse(null);
         if (Objects.isNull(existingAssignment)) {
-            authorizationManager.roleAssignments().define(roleAssignmentName)
-                .forObjectId(identityId)
-                .withBuiltInRole(BuiltInRole.STORAGE_BLOB_DATA_CONTRIBUTOR)
-                .withScope(storageAccount.getId()).create();
+            try {
+                authorizationManager.roleAssignments().define(roleAssignmentName)
+                    .forObjectId(identityId)
+                    .withBuiltInRole(BuiltInRole.STORAGE_BLOB_DATA_CONTRIBUTOR)
+                    .withScope(storageAccount.getId()).create();
+            } catch (final Throwable t) {
+                final String message = String.format("Failed to assign role '%s' to managed identity '%s'",
+                    BuiltInRole.STORAGE_BLOB_DATA_CONTRIBUTOR, identityId);
+                throw new AzureToolkitRuntimeException(message, t);
+            }
         } // ba92f5b4-2d11-453d-a403-e96b0029c9fe
     }
 
