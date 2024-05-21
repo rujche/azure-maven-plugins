@@ -112,16 +112,19 @@ public abstract class FunctionAppBase<T extends FunctionAppBase<T, P, F>, P exte
             } else {
                 final String fxString = r.linuxFxVersion();
                 if (StringUtils.isEmpty(fxString)) {
-                    final boolean isFlexConsumption = Optional.ofNullable(getAppServicePlan())
-                        .map(AppServicePlan::getPricingTier)
-                        .map(PricingTier::isFlexConsumption).orElse(false);
-                    return isFlexConsumption ? getFlexConsumptionRuntime() : null;
+                    return isFlexConsumptionApp() ? getFlexConsumptionRuntime() : null;
                 } else if (StringUtils.startsWithIgnoreCase(fxString, "docker")) {
                     return FunctionAppDockerRuntime.INSTANCE;
                 }
                 return FunctionAppLinuxRuntime.fromFxString(fxString);
             }
         }).orElse(null);
+    }
+
+    public boolean isFlexConsumptionApp() {
+        return Optional.ofNullable(getAppServicePlan())
+            .map(AppServicePlan::getPricingTier)
+            .map(PricingTier::isFlexConsumption).orElse(false);
     }
 
     private FunctionAppRuntime getFlexConsumptionRuntime() {

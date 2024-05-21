@@ -239,6 +239,10 @@ public class FunctionApp extends FunctionAppBase<FunctionApp, AppServiceServiceS
         return Optional.ofNullable(this.getRemote()).map(com.azure.resourcemanager.appservice.models.FunctionApp::managedEnvironmentId).orElse(null);
     }
 
+    public boolean isContainerHostingFunctionApp() {
+        return StringUtils.isNotBlank(getEnvironmentId());
+    }
+
     @NotNull
     @Override
     protected String loadStatus(@NotNull final WebAppBase remote) {
