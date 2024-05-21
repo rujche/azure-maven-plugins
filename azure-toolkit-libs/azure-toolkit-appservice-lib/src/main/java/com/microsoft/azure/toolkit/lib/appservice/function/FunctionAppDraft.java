@@ -67,6 +67,7 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -289,9 +290,9 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
                     .withBuiltInRole(BuiltInRole.STORAGE_BLOB_DATA_CONTRIBUTOR)
                     .withScope(storageAccount.getId()).create();
             } catch (final Throwable t) {
-                final String message = String.format("Failed to assign role '%s' to managed identity '%s'",
-                    BuiltInRole.STORAGE_BLOB_DATA_CONTRIBUTOR, identityId);
-                throw new AzureToolkitRuntimeException(message, t);
+                final String message = String.format("Failed to assign role '%s' to managed identity '%s', please assign the role manually or your app may not able to work : %s",
+                    BuiltInRole.STORAGE_BLOB_DATA_CONTRIBUTOR, identityId, ExceptionUtils.getMessage(t));
+                AzureMessager.getMessager().error(message, t);
             }
         } // ba92f5b4-2d11-453d-a403-e96b0029c9fe
     }
