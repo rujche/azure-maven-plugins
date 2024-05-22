@@ -15,6 +15,7 @@ import java.io.File;
 import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -23,9 +24,6 @@ import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static com.microsoft.azure.sdk.build.tool.util.MojoUtils.failOrWarn;
-import static com.microsoft.azure.sdk.build.tool.util.MojoUtils.getString;
 
 /**
  * Performs the following tasks:
@@ -49,11 +47,12 @@ public class AnnotationProcessingTool implements Runnable {
         final Set<String> interestedPackages = new TreeSet<>(Comparator.comparingInt(String::length));
         MojoUtils.getCompileSourceRoots().forEach(root -> buildPackageList(root, root, interestedPackages));
 
-        final ClassLoader classLoader = AnnotationUtils.getCompleteClassLoader(getAllPaths());
+        final List<Path> allPaths = getAllPaths();
+        final ClassLoader classLoader = AnnotationUtils.getCompleteClassLoader(allPaths.stream());
 
         // Collect all calls to methods annotated with the Azure SDK @ServiceMethod annotation
         Optional<Set<AnnotatedMethodCallerResult>> serviceMethodCallers = AnnotationUtils.getAnnotation("com.azure.core.annotation.ServiceMethod", classLoader)
-            .map(a -> AnnotationUtils.findCallsToAnnotatedMethod(a, getAllPaths(), interestedPackages, true));
+            .map(a -> AnnotationUtils.findCallsToAnnotatedMethod(a, allPaths.stream(), interestedPackages, true));
 
         if (serviceMethodCallers.isPresent()) {
             List<MethodCallDetails> serviceMethodCallDetails = getMethodCallDetails(serviceMethodCallers.get());
@@ -62,7 +61,7 @@ public class AnnotationProcessingTool implements Runnable {
 
         // Collect all calls to methods annotated with the Azure SDK @Beta annotation
         Optional<Set<AnnotatedMethodCallerResult>> betaMethodCallers = AnnotationUtils.getAnnotation("com.azure.cosmos.util.Beta", classLoader)
-            .map(a -> AnnotationUtils.findCallsToAnnotatedMethod(a, getAllPaths(), interestedPackages, true));
+            .map(a -> AnnotationUtils.findCallsToAnnotatedMethod(a, allPaths.stream(), interestedPackages, true));
         if (betaMethodCallers.isPresent()) {
             List<MethodCallDetails> betaMethodCallDetails = getMethodCallDetails(betaMethodCallers.get());
 
@@ -88,16 +87,17 @@ public class AnnotationProcessingTool implements Runnable {
             .collect(Collectors.toList());
     }
 
-    private static Stream<Path> getAllPaths() {
+    private static List<Path> getAllPaths() {
         // This is the user maven build target directory - we look in here for the compiled source code
         final File targetDir = new File(AzureSdkMojo.getMojo().getProject().getBuild().getDirectory() + "/classes/");
 
-        // this stream of paths is a stream containing the users maven project compiled class files, as well as all
+        // this is a list containing the users maven project compiled class files, as well as all
         // jar file dependencies. We use this to analyse the use of annotations and report back to the user.
-        return Stream.concat(
-                Stream.of(targetDir.getAbsolutePath()),
-                MojoUtils.getAllDependencies().stream().map(a -> a.getFile().getAbsolutePath()))
-            .map(Paths::get);
+        List<Path> allPaths = new ArrayList<>();
+        allPaths.add(Paths.get(targetDir.getAbsolutePath()));
+        final List<Path> collect = MojoUtils.getAllDependencies().stream().map(a -> a.getFile().getAbsolutePath()).map(Paths::get).collect(Collectors.toList());
+        allPaths.addAll(collect);
+        return allPaths;
     }
 
     private static void buildPackageList(String rootDir, String currentDir, Set<String> packages) {

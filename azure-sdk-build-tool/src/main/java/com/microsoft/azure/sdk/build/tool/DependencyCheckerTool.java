@@ -18,9 +18,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static com.microsoft.azure.sdk.build.tool.util.MojoUtils.failOrWarn;
-import static com.microsoft.azure.sdk.build.tool.util.MojoUtils.getString;
-
 /**
  * Performs the following tasks:
  *
@@ -94,7 +91,7 @@ public class DependencyCheckerTool implements Runnable {
     private void checkForAzureSdkDependencyVersions() {
         List<Dependency> dependencies = AzureSdkMojo.getMojo().getProject().getDependencies();
         List<Dependency> dependenciesWithOverriddenVersions = dependencies.stream()
-                .filter(dependency -> dependency.getGroupId().equals("com.azure"))
+                .filter(dependency -> "com.azure".equals(dependency.getGroupId()))
                 .filter(dependency -> {
                     InputLocation location = dependency.getLocation("version");
                     // if the version is not coming from Azure SDK BOM, filter those dependencies
@@ -107,7 +104,7 @@ public class DependencyCheckerTool implements Runnable {
             Arrays.asList(MavenUtils.toGAV(dependency))));
 
         List<Dependency> betaDependencies = dependencies.stream()
-                .filter(dependency -> dependency.getGroupId().equals("com.azure"))
+                .filter(dependency -> "com.azure".equals(dependency.getGroupId()))
                 .filter(dependency -> dependency.getVersion().contains("-beta"))
                 .collect(Collectors.toList());
 
@@ -158,7 +155,7 @@ public class DependencyCheckerTool implements Runnable {
         if (!outdatedTransitiveDependencies.isEmpty()) {
             // convert each track one dependency into actionable guidance
             StringBuilder message = new StringBuilder(MojoUtils.getString("deprecatedIndirectDependency"));
-            for (OutdatedDependency outdatedDependency : outdatedDirectDependencies) {
+            for (OutdatedDependency outdatedDependency : outdatedTransitiveDependencies) {
                 message.append("\n    - ")
                     .append(outdatedDependency.getOutdatedDependency());
             }

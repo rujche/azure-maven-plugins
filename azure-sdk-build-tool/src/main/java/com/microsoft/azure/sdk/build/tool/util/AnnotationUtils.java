@@ -69,7 +69,7 @@ public final class AnnotationUtils {
      * @param annotation The annotation on the method to look for.
      * @param paths The paths to scan.
      * @param interestedPackages The packages that this scan should be limited to.
-     * @param recursive If true, look for packages in the sub-directories of the given paths.
+     * @param recursive If true, recursively scan all method calls in all interested packages to find any invocation to the annotated methods.
      * @return A set of methods that call methods with the annotation.
      */
     public static Set<AnnotatedMethodCallerResult> findCallsToAnnotatedMethod(final Class<? extends Annotation> annotation,

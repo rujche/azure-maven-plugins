@@ -76,7 +76,6 @@ public class AzureDependencyMapping {
                 return Optional.empty();
             }
         }
-
         return Optional.empty();
     }
 }
