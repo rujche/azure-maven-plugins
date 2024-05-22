@@ -7,6 +7,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.util.Objects;
 
 @Data
 @Builder
@@ -18,11 +20,8 @@ public class FunctionAppConfig {
         .runtime(FunctionsRuntime.DEFAULT_RUNTIME)
         .scaleAndConcurrency(FunctionScaleAndConcurrency.DEFAULT_SCALE_CONFIGURATION)
         .build();
-    @Nonnull
     private FunctionsDeployment deployment;
-    @Nonnull
     private FunctionsRuntime runtime;
-    @Nonnull
     private FunctionScaleAndConcurrency scaleAndConcurrency;
 
     @Data
@@ -31,7 +30,6 @@ public class FunctionAppConfig {
     @AllArgsConstructor
     public static class FunctionsDeployment {
         public static final FunctionsDeployment DEFAULT_DEPLOYMENT = FunctionsDeployment.builder().storage(Storage.DEFAULT_STORAGE).build();
-        @Nonnull
         private Storage storage;
     }
 
@@ -72,7 +70,11 @@ public class FunctionAppConfig {
             @Builder.Default
             private String storageAccountConnectionStringName = DEPLOYMENT_STORAGE_CONNECTION_STRING;
 
+            @Nullable
             public static Authentication fromConfiguration(FlexConsumptionConfiguration configuration) {
+                if (Objects.isNull(configuration.getAuthenticationMethod())) {
+                    return null;
+                }
                 switch (configuration.getAuthenticationMethod()) {
                     case StorageAccountConnectionString:
                         return Authentication.builder()
