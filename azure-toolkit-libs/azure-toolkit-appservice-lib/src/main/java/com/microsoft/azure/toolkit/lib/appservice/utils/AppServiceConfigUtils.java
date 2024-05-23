@@ -25,7 +25,6 @@ import org.apache.commons.lang3.StringUtils;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 import static com.microsoft.azure.toolkit.lib.common.utils.Utils.copyProperties;
@@ -35,11 +34,11 @@ public class AppServiceConfigUtils {
 
     public static FunctionAppConfig fromFunctionApp(@Nonnull FunctionAppBase<?, ?, ?> app) {
         return app instanceof FunctionApp && StringUtils.isNotBlank(((FunctionApp) app).getEnvironmentId()) ?
-            fromFunctionApp((FunctionApp) app, Objects.requireNonNull(((FunctionApp) app).getEnvironment())) :
-            fromFunctionApp(app, Objects.requireNonNull(app.getAppServicePlan()));
+            fromFunctionApp((FunctionApp) app, ((FunctionApp) app).getEnvironment()) :
+            fromFunctionApp(app, app.getAppServicePlan());
     }
 
-    public static FunctionAppConfig fromFunctionApp(@Nonnull FunctionAppBase<?, ?, ?> app, @Nonnull AppServicePlan servicePlan) {
+    public static FunctionAppConfig fromFunctionApp(@Nonnull FunctionAppBase<?, ?, ?> app, @Nullable AppServicePlan servicePlan) {
         final FunctionAppConfig result = new FunctionAppConfig();
         fromAppService(app, servicePlan, result);
         // todo merge storage account configurations

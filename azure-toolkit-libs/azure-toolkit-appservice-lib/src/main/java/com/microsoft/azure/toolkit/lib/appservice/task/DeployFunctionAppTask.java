@@ -126,7 +126,9 @@ public class DeployFunctionAppTask extends AzureTask<FunctionAppBase<?, ?, ?>> {
                             .withLabel(String.format("Trigger \"%s\"", trigger.getName()))).orElse(null);
                 }
             }).filter(Objects::nonNull).collect(Collectors.toCollection(LinkedList::new));
-            Optional.ofNullable(streamingLog).ifPresent(action -> actions.add(0, action));
+            Optional.ofNullable(streamingLog)
+                .filter(ignore -> !(target instanceof FunctionApp && target.isFlexConsumptionApp())) // log streaming is not supported for
+                .ifPresent(action -> actions.add(0, action));
             messager.info(String.format(DEPLOY_FINISH), actions.toArray());
         } else {
             messager.info(String.format(DEPLOY_FINISH));
