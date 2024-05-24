@@ -6,7 +6,6 @@
 package com.microsoft.azure.toolkit.lib.containerregistry;
 
 import com.azure.resourcemanager.containerregistry.models.RegistryTaskRun;
-import com.azure.resourcemanager.resources.fluentcore.arm.ResourceId;
 import com.microsoft.azure.toolkit.lib.common.utils.StreamingLogSupport;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -30,9 +29,8 @@ import java.util.stream.Collectors;
 @NoArgsConstructor
 @AllArgsConstructor
 public class RegistryTaskRunStreamingLog implements StreamingLogSupport {
-    private static final int MAX_RETRY = 8;
     private static final int RETRY_INTERVAL = 1000;
-    private static final int WAIT_INTERVAL = 200;
+    private static final int WAIT_INTERVAL = 500;
 
     private RegistryTaskRun task;
     private String logSasUrl;
@@ -54,11 +52,11 @@ public class RegistryTaskRunStreamingLog implements StreamingLogSupport {
         return Flux.create(sink -> {
             String content = StringUtils.EMPTY;
             try {
-                for (int i = 0; i < MAX_RETRY; ) {
-                    final String newContent = readFromUrl(logSasUrl);
+                for (int i = 0; ; ) {
+                    final String newContent = StringUtils.substringBeforeLast(readFromUrl(logSasUrl), "\n");
                     if (StringUtils.equals(newContent, content)) {
                         i++;
-                        Thread.sleep(RETRY_INTERVAL);
+                        Thread.sleep(RETRY_INTERVAL * i);
                         continue;
                     }
                     Arrays.stream(StringUtils.removeStart(newContent, content).split("\n")).forEach(sink::next);

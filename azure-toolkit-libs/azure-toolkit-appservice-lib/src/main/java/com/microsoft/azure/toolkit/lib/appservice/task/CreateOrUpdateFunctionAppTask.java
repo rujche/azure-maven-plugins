@@ -81,7 +81,8 @@ public class CreateOrUpdateFunctionAppTask extends AzureTask<FunctionAppBase<?, 
     private static final String FUNCTION_APP_NOT_EXIST_FOR_SLOT = "The Function App specified in pom.xml does not exist. " +
         "Please make sure the Function App name is correct.";
 
-    public static final String FLEX_CONSUMPTION_SLOT_NOT_SUPPORT = "Deployment slot is not supported for function app with consumption plan.";
+    public static final String FLEX_CONSUMPTION_SLOT_NOT_SUPPORT = "Deployment slot is not supported for function app with flex consumption plan.";
+    public static final String DEPLOYMENT_CONTAINER_NAME_MISSED = "Failed to get deployment container from app %s, please either set it manually in tooling or correct the value in Azure";
 
     private final FunctionAppConfig functionAppConfig;
     private final List<AzureTask<?>> tasks = new ArrayList<>();
@@ -133,8 +134,8 @@ public class CreateOrUpdateFunctionAppTask extends AzureTask<FunctionAppBase<?, 
         }
         if (isFlexConsumptionFunctionApp(appDraft)) {
             // create new storage account when create function app
-            registerSubTask(getDeploymentStorageAccount(), result -> this.deploymentStorageAccount = result);
-            registerSubTask(getDeploymentStorageContainer(), result -> this.deploymentContainer = result);
+            registerSubTask(getDeploymentStorageAccount(appDraft), result -> this.deploymentStorageAccount = result);
+            registerSubTask(getDeploymentStorageContainer(appDraft), result -> this.deploymentContainer = result);
         }
         if (StringUtils.isEmpty(functionAppConfig.deploymentSlotName())) {
             final AzureTask<FunctionApp> functionTask = appDraft.exists() ? getUpdateFunctionAppTask(appDraft) : getCreateFunctionAppTask(appDraft);
@@ -147,14 +148,12 @@ public class CreateOrUpdateFunctionAppTask extends AzureTask<FunctionAppBase<?, 
         }
     }
 
-    private AzureTask<BlobContainer> getDeploymentStorageContainer() {
+    private AzureTask<BlobContainer> getDeploymentStorageContainer(final FunctionAppDraft appDraft) {
         return new AzureTask<>(() -> {
             final FlexConsumptionConfiguration flexConfiguration = functionAppConfig.flexConsumptionConfiguration();
-            final String prefix = "app-package";
-            final String appName = StringUtils.substringBefore(functionAppConfig.appName().replaceAll("[^a-zA-Z0-9]", ""), 32);
-            final String randomNum = String.valueOf(new Random().nextInt(1000000));
-            final String containerName = Optional.ofNullable(flexConfiguration).map(FlexConsumptionConfiguration::getDeploymentContainer)
-                .orElseGet(() -> prefix + "-" + appName + "-" + randomNum);
+            final String containerName = Optional.ofNullable(flexConfiguration)
+                .map(FlexConsumptionConfiguration::getDeploymentContainer)
+                .orElseGet(() -> getDeploymentContainerNameFromApp(appDraft));
             final BlobContainer container = deploymentStorageAccount.getBlobContainerModule().getOrDraft(containerName, functionAppConfig.resourceGroup());
             if (container.isDraftForCreating()) {
                 ((BlobContainerDraft) container).commit();
@@ -163,14 +162,28 @@ public class CreateOrUpdateFunctionAppTask extends AzureTask<FunctionAppBase<?, 
         });
     }
 
-    private AzureTask<StorageAccount> getDeploymentStorageAccount() {
+    private String getDeploymentContainerNameFromApp(final FunctionAppDraft appDraft) {
+        if (appDraft.isDraftForCreating()) {
+            final String prefix = "app-package";
+            final String appName = StringUtils.substringBefore(functionAppConfig.appName().replaceAll("[^a-zA-Z0-9]", ""), 32);
+            final String randomNum = String.valueOf(new Random().nextInt(1000000));
+            return prefix + "-" + appName + "-" + randomNum;
+        } else {
+            return Optional.ofNullable(appDraft.getFlexConsumptionConfiguration())
+                .map(FlexConsumptionConfiguration::getDeploymentContainer)
+                .orElseThrow(() -> new AzureToolkitRuntimeException(String.format(DEPLOYMENT_CONTAINER_NAME_MISSED, functionAppConfig.appName())));
+        }
+    }
+
+    private AzureTask<StorageAccount> getDeploymentStorageAccount(final FunctionAppDraft appDraft) {
         final FlexConsumptionConfiguration flexConsumptionConfiguration = functionAppConfig.flexConsumptionConfiguration();
         final String accountName = Optional.ofNullable(flexConsumptionConfiguration)
             .map(FlexConsumptionConfiguration::getDeploymentAccount).orElse(null);
         final String resourceGroupName = Optional.ofNullable(flexConsumptionConfiguration)
             .map(FlexConsumptionConfiguration::getDeploymentResourceGroup).orElse(functionAppConfig.resourceGroup());
         if (StringUtils.isBlank(accountName)) {
-            return new AzureTask<>(() -> storageAccount);
+            // if new create, use function storage(AzureWebJobsStorage) directly, or else, use storage from remote configuration
+            return new AzureTask<>(() -> getDeploymentStorageFromApp(appDraft));
         }
         final ResourceGroup resourceGroup = Azure.az(AzureResources.class).groups(functionAppConfig.subscriptionId())
             .getOrDraft(resourceGroupName, resourceGroupName);
@@ -179,6 +192,18 @@ public class CreateOrUpdateFunctionAppTask extends AzureTask<FunctionAppBase<?, 
             registerSubTask(new CreateResourceGroupTask(functionAppConfig.subscriptionId(), resourceGroupName, region), result -> this.resourceGroup = result);
         }
         return getStorageAccountTask(accountName, resourceGroupName);
+    }
+
+    private StorageAccount getDeploymentStorageFromApp(final FunctionAppDraft appDraft) {
+        if (appDraft.isDraftForCreating()) {
+            return storageAccount;
+        }
+        final FlexConsumptionConfiguration flexConsumptionConfiguration = appDraft.getFlexConsumptionConfiguration();
+        if (flexConsumptionConfiguration == null) {
+            return storageAccount;
+        }
+        return Azure.az(AzureStorageAccount.class).forSubscription(appDraft.getSubscriptionId()).storageAccounts()
+            .get(flexConsumptionConfiguration.getDeploymentAccount(), flexConsumptionConfiguration.getDeploymentResourceGroup());
     }
 
     private boolean isFlexConsumptionFunctionApp(final FunctionAppDraft appDraft) {
