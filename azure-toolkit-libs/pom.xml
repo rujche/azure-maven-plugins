@@ -380,7 +380,7 @@
             <dependency>
                 <groupId>com.azure.resourcemanager</groupId>
                 <artifactId>azure-resourcemanager-appservice</artifactId>
-                <version>${azure.resourcemanager.version}</version>
+                <version>2.39.0</version>
             </dependency>
             <dependency>
                 <groupId>com.azure.resourcemanager</groupId>
