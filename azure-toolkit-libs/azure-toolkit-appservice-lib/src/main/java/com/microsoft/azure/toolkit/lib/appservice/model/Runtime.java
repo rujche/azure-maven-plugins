@@ -127,7 +127,7 @@ public interface Runtime {
         AzureString message = null;
         if (Objects.nonNull(runtime)) {
             final String link = runtime instanceof FunctionAppRuntime ? String.format(" refer to %s", FUNCTION_UPGRADE_RUNTIME_LINK) : "";
-            if (runtime.isHidden() || runtime.isDeprecated()) {
+            if (runtime.isDeprecated()) {
                 if (Objects.nonNull(runtime.getEndOfLifeDate())) {
                     message = AzureString.format("The runtime of your app \"%s\" has reached EOL on %s and is no longer supported, please upgrade it." + link,
                         runtime.toString(), runtime.getEndOfLifeDate().format(DateTimeFormatter.ISO_DATE));
@@ -140,6 +140,8 @@ public interface Runtime {
                 message = AzureString.format("The runtime of your app \"%s\" is preview, please be careful to use it in production environment." + link, runtime.toString());
             } else if (Objects.nonNull(runtime.getEndOfLifeDate()) && runtime.getEndOfLifeDate().minusMonths(6).isBefore(OffsetDateTime.now())) {
                 message = AzureString.format("The runtime of your app \"%s\" will reach EOL on %s and will no longer be supported, please upgrade it." + link, runtime.toString(), runtime.getEndOfLifeDate().format(DateTimeFormatter.ISO_DATE));
+            } else if (runtime.isHidden()) {
+                message = AzureString.format("The runtime of your app \"%s\" is not intended to be used, please be careful to use it in production environment." + link, runtime.toString());
             }
         }
         if (Objects.nonNull(message)) {
