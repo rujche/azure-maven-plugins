@@ -8,7 +8,6 @@ package com.microsoft.azure.maven.function;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper;
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsSchema;
-import com.google.common.collect.Sets;
 import com.microsoft.azure.toolkit.lib.Azure;
 import com.microsoft.azure.toolkit.lib.appservice.AzureAppService;
 import com.microsoft.azure.toolkit.lib.appservice.config.AppServiceConfig;
@@ -46,7 +45,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES;
@@ -62,11 +60,6 @@ public class DeployMojo extends AbstractFunctionMojo {
     private static final String APPLICATION_INSIGHTS_CONFIGURATION_CONFLICT = "Contradictory configurations for application insights," +
             " specify 'appInsightsKey' or 'appInsightsInstance' if you want to enable it, and specify " +
             "'disableAppInsights=true' if you want to disable it.";
-    private static final String ARTIFACT_INCOMPATIBLE_WARNING = "Your function app artifact compile version {0} may not compatible with java version {1} in " +
-            "configuration.";
-    private static final String ARTIFACT_INCOMPATIBLE_ERROR = "Your function app artifact compile version {0} is not compatible with java version {1} in " +
-            "configuration, please downgrade the project compile version and try again.";
-    private static final String NO_ARTIFACT_FOUNDED = "Failed to find function artifact '%s.jar' in folder '%s', please re-package the project and try again.";
     private static final String APP_NAME_PATTERN = "[a-zA-Z0-9\\-]{2,60}";
     private static final String RESOURCE_GROUP_PATTERN = "[a-zA-Z0-9._\\-()]{1,90}";
     private static final String SLOT_NAME_PATTERN = "[A-Za-z0-9-]{1,60}";
@@ -88,13 +81,9 @@ public class DeployMojo extends AbstractFunctionMojo {
             "please refer to https://aka.ms/maven_function_configuration#supported-pricing-tiers for valid values";
     private static final String EXPANDABLE_REGION_WARNING = "'%s' may not be a valid region, " +
             "please refer to https://aka.ms/maven_function_configuration#supported-regions for valid values";
-    private static final String EXPANDABLE_JAVA_VERSION_WARNING = "'%s' may not be a valid java version, recommended values are `Java 8`, `Java 11` and `Java 17`";
     private static final String CV2_INVALID_CONTAINER_SIZE = "Invalid container size for flex consumption plan, valid values are: %s";
     public static final int MAX_MAX_INSTANCES = 1000;
     public static final int MIN_MAX_INSTANCES = 40;
-    public static final Set<Region> FLEX_CONSUMPTION_REGIONS = Collections.unmodifiableSet(Sets.newHashSet(Region.AUSTRALIA_EAST, Region.ASIA_EAST,
-        Region.US_EAST, Region.US_EAST2, Region.US_EAST2_EUAP, Region.EUROPE_NORTH, Region.US_SOUTH_CENTRAL, Region.UK_SOUTH, Region.ASIA_SOUTHEAST, Region.EUROPE_SWEDEN_CENTRAL,
-        Region.US_WEST2, Region.US_WEST3));
     public static final int MIN_HTTP_INSTANCE_CONCURRENCY = 1;
     public static final int MAX_HTTP_INSTANCE_CONCURRENCY = 1000;
 
@@ -222,7 +211,9 @@ public class DeployMojo extends AbstractFunctionMojo {
             final FunctionAppBase<?, ?, ?> target = createOrUpdateResource(app);
             deployArtifact(target);
         } catch (final Exception e) {
-            new StreamingLogTask(app).execute();
+            if (app.exists()) {
+                new StreamingLogTask(app).execute();
+            }
             throw new AzureToolkitRuntimeException(e);
         }
         updateTelemetryProperties();
@@ -258,7 +249,7 @@ public class DeployMojo extends AbstractFunctionMojo {
         final Region region = Optional.ofNullable(getRegion()).filter(StringUtils::isNotBlank).map(Region::fromName).orElse(null);
         final String supportedRegionsValue = regions.stream().map(Region::getName).collect(Collectors.joining(","));
         if (Objects.nonNull(region) && !regions.contains(region)) {
-            throw new AzureToolkitRuntimeException("`%s` is not a valid region for flex consumption app, supported values are %s", region.getName(), supportedRegionsValue);
+            throw new AzureToolkitRuntimeException(String.format("`%s` is not a valid region for flex consumption app, supported values are %s", region.getName(), supportedRegionsValue));
         }
         // runtime
         final List<? extends FunctionAppRuntime> validFlexRuntimes = Objects.isNull(region) ? Collections.emptyList() :

@@ -99,6 +99,8 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
     public static final String SERVICE_PLAN_MISSING_MESSAGE = "'service plan' is required to create a Function App";
     public static final String UNSUPPORTED_OPERATING_SYSTEM_FOR_CONTAINER_APP = "Unsupported operating system %s for function app on container app";
     public static final String STORAGE_BLOB_DATA_CONTRIBUTOR_ROLE_ID = "ba92f5b4-2d11-453d-a403-e96b0029c9fe";
+    public static final String ROLE_NOT_AFFECT = "The role '%s' has been assigned to the managed identity '%s'. This process may take several minutes to take effect. " +
+        "If you encounter any exceptions during deployment, please try again later.";
 
     @Getter
     @Nullable
@@ -276,25 +278,35 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
                 .map(Map.Entry::getValue)
                 .map(UserAssignedIdentity::principalId).orElseThrow(()-> new RuntimeException("User assigned identity not found"));
         final String roleAssignmentName = UUID.randomUUID().toString();
-        final AuthorizationManager authorizationManager = Objects.requireNonNull(this.getParent().getRemote()).authorizationManager();
-        final String roleDefinitionId = String.format("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", getSubscriptionId(), STORAGE_BLOB_DATA_CONTRIBUTOR_ROLE_ID);
-        final RoleAssignment existingAssignment = authorizationManager.roleAssignments()
-            .listByScope(storageAccount.getId()).stream()
-            .filter(assignment -> StringUtils.equalsIgnoreCase(assignment.principalId(), identityId) &&
-                StringUtils.equalsIgnoreCase(assignment.roleDefinitionId(), roleDefinitionId))
-            .findFirst().orElse(null);
+        final String scope = storageAccount.getId();
+        final RoleAssignment existingAssignment = getExistingRoleAssignment(identityId, scope);
         if (Objects.isNull(existingAssignment)) {
             try {
+                final AuthorizationManager authorizationManager = Objects.requireNonNull(this.getParent().getRemote()).authorizationManager();
                 authorizationManager.roleAssignments().define(roleAssignmentName)
                     .forObjectId(identityId)
                     .withBuiltInRole(BuiltInRole.STORAGE_BLOB_DATA_CONTRIBUTOR)
-                    .withScope(storageAccount.getId()).create();
+                    .withScope(scope).create();
+                final RoleAssignment existingRoleAssignment = getExistingRoleAssignment(identityId, scope);
+                if (Objects.isNull(existingRoleAssignment)) {
+                    AzureMessager.getMessager().error(String.format(ROLE_NOT_AFFECT, BuiltInRole.STORAGE_BLOB_DATA_CONTRIBUTOR, identityId));
+                }
             } catch (final Throwable t) {
                 final String message = String.format("Failed to assign role '%s' to managed identity '%s', please assign the role manually or your app may not able to work : %s",
                     BuiltInRole.STORAGE_BLOB_DATA_CONTRIBUTOR, identityId, ExceptionUtils.getMessage(t));
                 AzureMessager.getMessager().error(message, t);
             }
         } // ba92f5b4-2d11-453d-a403-e96b0029c9fe
+    }
+
+    private RoleAssignment getExistingRoleAssignment(final String identityId, final String scope) {
+        final AuthorizationManager authorizationManager = Objects.requireNonNull(this.getParent().getRemote()).authorizationManager();
+        final String roleDefinitionId = String.format("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", getSubscriptionId(), STORAGE_BLOB_DATA_CONTRIBUTOR_ROLE_ID);
+        return authorizationManager.roleAssignments()
+            .listByScope(scope).stream()
+            .filter(assignment -> StringUtils.equalsIgnoreCase(assignment.principalId(), identityId) &&
+                StringUtils.equalsIgnoreCase(assignment.roleDefinitionId(), roleDefinitionId))
+            .findFirst().orElse(null);
     }
 
     private boolean shouldEnableDistributedTracing(@Nullable final AppServicePlan servicePlan, @Nullable final Map<String, String> appSettings) {
