@@ -147,7 +147,6 @@ extends:
                     TARGET_URL="https://azuresdkpartnerdrops.blob.core.windows.net/drops/$AzTargetPath/"
                     azcopy remove "$TARGET_URL"
                     azcopy copy ".release/*" "$TARGET_URL"
-                    azcopy copy ".release/*" "https://azuresdkpartnerdrops.blob.core.windows.net/drops/$AzTargetPath/"
                     echo "Resources uploaded."
                 env:
                   AZCOPY_AUTO_LOGIN_TYPE: 'PSCRED'
