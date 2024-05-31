@@ -130,6 +130,27 @@ extends:
                 env:
                   AzureServicesAuthConnectionString: runAs=App;AppId=$(ApiScanClientId);TenantId=$(ApiScanTenant);AppKey=$(ApiScanSecret)
 
+              - task: AzurePowerShell@5
+                displayName: 'Upload files to partner drop folder'
+                inputs:
+                  azureSubscription: 'azuresdkpartnerdrops_javatooling'
+                  ScriptType: 'InlineScript'
+                  azurePowerShellVersion: LatestVersion
+                  pwsh: true
+                  Inline: |
+                    # Validate storage path
+                    AzTargetPath=$(TARGET_PATH)
+                    if [[ ! "$AzTargetPath" =~ "/java/" ]]; then
+                        echo "Invalid path, please follow pattern {product}/java/{version}"
+                        exit -1
+                    fi
+                    TARGET_URL="https://azuresdkpartnerdrops.blob.core.windows.net/drops/$AzTargetPath/"
+                    azcopy remove "$TARGET_URL"
+                    azcopy copy ".release/*" "$TARGET_URL"
+                    echo "Resources uploaded."
+                env:
+                  AZCOPY_AUTO_LOGIN_TYPE: 'PSCRED'
+
               - task: Bash@3
                 displayName: Upload to Azure Storage
                 inputs:
