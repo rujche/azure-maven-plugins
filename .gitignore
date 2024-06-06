@@ -48,4 +48,4 @@ jacoco.exec
 bin/
 
 # ignore azure-sdk-usage-report.txt
-azure-sdk-usage-report.txt
+**/azure-sdk-usage-report.txt
