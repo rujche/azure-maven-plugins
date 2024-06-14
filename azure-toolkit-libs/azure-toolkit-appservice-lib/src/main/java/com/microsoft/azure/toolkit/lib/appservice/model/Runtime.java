@@ -138,8 +138,13 @@ public interface Runtime {
                 message = AzureString.format("The runtime of your app \"%s\" is early access, please be careful to use it in production environment." + link, runtime.toString());
             } else if (runtime.isPreview()) {
                 message = AzureString.format("The runtime of your app \"%s\" is preview, please be careful to use it in production environment." + link, runtime.toString());
-            } else if (Objects.nonNull(runtime.getEndOfLifeDate()) && runtime.getEndOfLifeDate().minusMonths(6).isBefore(OffsetDateTime.now())) {
-                message = AzureString.format("The runtime of your app \"%s\" will reach EOL on %s and will no longer be supported, please upgrade it." + link, runtime.toString(), runtime.getEndOfLifeDate().format(DateTimeFormatter.ISO_DATE));
+            } else if (Objects.nonNull(runtime.getEndOfLifeDate())) {
+                if (runtime.getEndOfLifeDate().isAfter(OffsetDateTime.now())) {
+                    message = AzureString.format("The runtime of your app \"%s\" will reach EOL on %s and will no longer be supported, please upgrade it." + link, runtime.toString(), runtime.getEndOfLifeDate().format(DateTimeFormatter.ISO_DATE));
+                } else {
+                    message = AzureString.format("The runtime of your app \"%s\" has reached EOL on %s and is no longer supported, please upgrade it." + link,
+                        runtime.toString(), runtime.getEndOfLifeDate().format(DateTimeFormatter.ISO_DATE));
+                }
             } else if (runtime.isHidden()) {
                 message = AzureString.format("The runtime of your app \"%s\" is not intended to be used, please be careful to use it in production environment." + link, runtime.toString());
             }
