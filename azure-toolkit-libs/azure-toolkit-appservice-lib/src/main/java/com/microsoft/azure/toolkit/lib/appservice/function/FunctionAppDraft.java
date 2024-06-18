@@ -182,7 +182,7 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
                 final String profile = Optional.ofNullable(containerConfiguration).map(ContainerAppFunctionConfiguration::getWorkloadProfileMame).orElse(null);
                 final SiteInner siteInner = ((com.azure.resourcemanager.appservice.models.FunctionApp) withCreate).innerModel();
                 siteInner.withWorkloadProfileName(StringUtils.isBlank(profile) ? "Consumption" : profile); // if profile not set, use Consumption
-                if (StringUtils.isNotBlank(profile) && !StringUtils.equalsIgnoreCase(profile, "Consumption")) {
+                if (Objects.nonNull(containerConfiguration) && ObjectUtils.anyNotNull(containerConfiguration.getCpu(), containerConfiguration.getMemory())) {
                     final ResourceConfig resourceConfig = new ResourceConfig();
                     resourceConfig.withCpu(containerConfiguration.getCpu());
                     resourceConfig.withMemory(containerConfiguration.getMemory());
