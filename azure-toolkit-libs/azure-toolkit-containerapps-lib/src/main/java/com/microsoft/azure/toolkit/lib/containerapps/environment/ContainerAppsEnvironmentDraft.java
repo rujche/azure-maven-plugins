@@ -27,6 +27,7 @@ import com.microsoft.azure.toolkit.lib.resource.ResourceGroupDraft;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
+import org.apache.commons.lang3.StringUtils;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -81,6 +82,9 @@ public class ContainerAppsEnvironmentDraft extends ContainerAppsEnvironment impl
         // if users did not set environment type,
         final List<com.azure.resourcemanager.appcontainers.models.WorkloadProfile> workloadProfiles = environmentType == EnvironmentType.ConsumptionOnly ? null :
             Objects.requireNonNull(getWorkloadProfiles()).stream().map(WorkloadProfile::toWorkloadProfile).collect(Collectors.toList());
+        if (Objects.nonNull(workloadProfiles) && workloadProfiles.stream().noneMatch(profile -> StringUtils.equalsIgnoreCase(profile.workloadProfileType(), WorkloadProfile.CONSUMPTION))) {
+            workloadProfiles.add(WorkloadProfile.toWorkloadProfile(WorkloadProfile.CONSUMPTION_PROFILE));
+        }
         final ManagedEnvironment managedEnvironment = client.define(config.getName())
                 .withRegion(com.azure.core.management.Region.fromName(config.getRegion().getName()))
                 .withExistingResourceGroup(Objects.requireNonNull(config.getResourceGroup(), "Resource Group is required to create Container app.").getResourceGroupName())
