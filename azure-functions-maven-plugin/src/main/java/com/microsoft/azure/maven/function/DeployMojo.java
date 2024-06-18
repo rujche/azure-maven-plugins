@@ -218,8 +218,8 @@ public class DeployMojo extends AbstractFunctionMojo {
      */
     @JsonProperty
     @Getter
-    @Parameter(property = "workloadProfileMame")
-    protected String workloadProfileMame;
+    @Parameter(property = "workloadProfileName")
+    protected String workloadProfileName;
 
     @Override
     @AzureOperation("user/functionapp.deploy_app")
