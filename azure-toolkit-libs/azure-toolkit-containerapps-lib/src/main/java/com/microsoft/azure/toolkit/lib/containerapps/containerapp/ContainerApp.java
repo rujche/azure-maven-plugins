@@ -27,12 +27,14 @@ import com.microsoft.azure.toolkit.lib.containerapps.AzureContainerAppsServiceSu
 import com.microsoft.azure.toolkit.lib.containerapps.environment.ContainerAppsEnvironment;
 import com.microsoft.azure.toolkit.lib.containerapps.model.IngressConfig;
 import com.microsoft.azure.toolkit.lib.containerapps.model.RevisionMode;
+import com.microsoft.azure.toolkit.lib.containerapps.model.WorkloadProfile;
 import com.microsoft.azure.toolkit.lib.containerregistry.AzureContainerRegistry;
 import com.microsoft.azure.toolkit.lib.containerregistry.ContainerRegistry;
 import com.microsoft.azure.toolkit.lib.servicelinker.ServiceLinkerConsumer;
 import com.microsoft.azure.toolkit.lib.servicelinker.ServiceLinkerModule;
 import lombok.Getter;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import javax.annotation.Nonnull;
@@ -286,5 +288,17 @@ public class ContainerApp extends AbstractAzResource<ContainerApp, AzureContaine
     @Override
     public ServiceLinkerModule getServiceLinkerModule() {
         return linkerModule;
+    }
+
+    @Nullable
+    public WorkloadProfile getWorkloadProfile() {
+        final ContainerAppsEnvironment managedEnvironment = getManagedEnvironment();
+        final com.azure.resourcemanager.appcontainers.models.ContainerApp remote = getRemote();
+        if (Objects.isNull(managedEnvironment) || Objects.isNull(remote)) {
+            return null;
+        }
+        return managedEnvironment.getWorkloadProfiles().stream()
+            .filter(p -> StringUtils.equalsIgnoreCase(p.getName(), remote.workloadProfileName()))
+            .findFirst().orElse(null);
     }
 }

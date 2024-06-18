@@ -34,8 +34,10 @@ import com.microsoft.azure.toolkit.lib.common.task.AzureTaskManager;
 import com.microsoft.azure.toolkit.lib.common.utils.Utils;
 import com.microsoft.azure.toolkit.lib.containerapps.environment.ContainerAppsEnvironment;
 import com.microsoft.azure.toolkit.lib.containerapps.environment.ContainerAppsEnvironmentDraft;
+import com.microsoft.azure.toolkit.lib.containerapps.model.EnvironmentType;
 import com.microsoft.azure.toolkit.lib.containerapps.model.IngressConfig;
 import com.microsoft.azure.toolkit.lib.containerapps.model.RevisionMode;
+import com.microsoft.azure.toolkit.lib.containerapps.model.WorkloadProfile;
 import com.microsoft.azure.toolkit.lib.containerregistry.AzureContainerRegistry;
 import com.microsoft.azure.toolkit.lib.containerregistry.AzureContainerRegistryModule;
 import com.microsoft.azure.toolkit.lib.containerregistry.ContainerRegistry;
@@ -114,12 +116,15 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
             .withContainers(ImageConfig.toContainers(imageConfig))
             .withScale(ScaleConfig.toScale(this.getScaleConfig()));
         AzureMessager.getMessager().progress(AzureString.format("Creating Azure Container App({0})...", this.getName()));
+        final String workloadProfile = containerAppsEnvironment.getEnvironmentType() == EnvironmentType.ConsumptionOnly ? null :
+            Optional.ofNullable(getWorkloadProfile()).map(WorkloadProfile::getName).orElse(WorkloadProfile.CONSUMPTION);
         final com.azure.resourcemanager.appcontainers.models.ContainerApp result = client.define(ensureConfig().getName())
             .withRegion(com.azure.core.management.Region.fromName(containerAppsEnvironment.getRegion().getName()))
             .withExistingResourceGroup(Objects.requireNonNull(ensureConfig().getResourceGroup(), "Resource Group is required to create Container app.").getResourceGroupName())
             .withManagedEnvironmentId(containerAppsEnvironment.getId())
             .withConfiguration(configuration)
             .withTemplate(template)
+            .withWorkloadProfileName(workloadProfile)
             .create();
         final Action<ContainerApp> updateImage = AzureActionManager.getInstance().getAction(ContainerApp.UPDATE_IMAGE).bind(this);
         final Action<ContainerApp> browse = AzureActionManager.getInstance().getAction(ContainerApp.BROWSE).bind(this);
@@ -366,6 +371,9 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         return Optional.ofNullable(config).map(Config::getIngressConfig).map(IngressConfig::isEnableIngress).orElseGet(super::isIngressEnabled);
     }
 
+    public WorkloadProfile getWorkloadProfile() {
+        return Optional.ofNullable(config).map(Config::getWorkloadProfile).orElseGet(super::getWorkloadProfile);
+    }
 
     @Override
     public boolean isModified() {
@@ -386,6 +394,8 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         private IngressConfig ingressConfig;
         @Nullable
         private ScaleConfig scaleConfig;
+        @Nullable
+        private WorkloadProfile workloadProfile;
     }
 
     @Setter

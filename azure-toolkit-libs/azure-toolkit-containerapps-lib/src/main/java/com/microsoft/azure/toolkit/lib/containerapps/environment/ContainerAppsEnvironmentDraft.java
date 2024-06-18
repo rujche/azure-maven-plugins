@@ -18,9 +18,11 @@ import com.microsoft.azure.toolkit.lib.common.model.AzResource;
 import com.microsoft.azure.toolkit.lib.common.model.Region;
 import com.microsoft.azure.toolkit.lib.common.model.Subscription;
 import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
+import com.microsoft.azure.toolkit.lib.containerapps.model.EnvironmentType;
+import com.microsoft.azure.toolkit.lib.containerapps.model.WorkloadProfile;
 import com.microsoft.azure.toolkit.lib.monitor.LogAnalyticsWorkspace;
-import com.microsoft.azure.toolkit.lib.resource.ResourceGroup;
 import com.microsoft.azure.toolkit.lib.monitor.LogAnalyticsWorkspaceDraft;
+import com.microsoft.azure.toolkit.lib.resource.ResourceGroup;
 import com.microsoft.azure.toolkit.lib.resource.ResourceGroupDraft;
 import lombok.Data;
 import lombok.Getter;
@@ -28,8 +30,10 @@ import lombok.Setter;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class ContainerAppsEnvironmentDraft extends ContainerAppsEnvironment implements AzResource.Draft<ContainerAppsEnvironment, ManagedEnvironment> {
     @Getter
@@ -73,10 +77,15 @@ public class ContainerAppsEnvironmentDraft extends ContainerAppsEnvironment impl
             appLogsConfiguration.withDestination("log-analytics").withLogAnalyticsConfiguration(analyticsConfiguration);
         }
         messager.info(AzureString.format("Start creating Azure Container Apps Environment({0})...", this.getName()));
+        final EnvironmentType environmentType = getEnvironmentType();
+        // if users did not set environment type,
+        final List<com.azure.resourcemanager.appcontainers.models.WorkloadProfile> workloadProfiles = environmentType == EnvironmentType.ConsumptionOnly ? null :
+            Objects.requireNonNull(getWorkloadProfiles()).stream().map(WorkloadProfile::toWorkloadProfile).collect(Collectors.toList());
         final ManagedEnvironment managedEnvironment = client.define(config.getName())
                 .withRegion(com.azure.core.management.Region.fromName(config.getRegion().getName()))
                 .withExistingResourceGroup(Objects.requireNonNull(config.getResourceGroup(), "Resource Group is required to create Container app.").getResourceGroupName())
-                .withAppLogsConfiguration(appLogsConfiguration).create();
+                .withAppLogsConfiguration(appLogsConfiguration)
+                .withWorkloadProfiles(workloadProfiles).create();
         final Action<ContainerAppsEnvironment> create = Optional.ofNullable(AzureActionManager.getInstance().getAction(CREATE_CONTAINER_APP))
             .map(action -> action.bind(this).withLabel("Create app")).orElse(null);
         messager.success(AzureString.format("Azure Container Apps Environment({0}) is successfully created.", this.getName()), create);
@@ -87,6 +96,18 @@ public class ContainerAppsEnvironmentDraft extends ContainerAppsEnvironment impl
     @Override
     public Region getRegion() {
         return Optional.ofNullable(config).map(Config::getRegion).orElseGet(super::getRegion);
+    }
+
+    @Nullable
+    @Override
+    public EnvironmentType getEnvironmentType() {
+        return Optional.ofNullable(config).map(Config::getEnvironmentType).orElseGet(super::getEnvironmentType);
+    }
+
+    @Nullable
+    @Override
+    public List<WorkloadProfile> getWorkloadProfiles() {
+        return Optional.ofNullable(config).map(Config::getWorkloadProfiles).orElseGet(super::getWorkloadProfiles);
     }
 
     @Override
@@ -122,5 +143,8 @@ public class ContainerAppsEnvironmentDraft extends ContainerAppsEnvironment impl
         private ResourceGroup resourceGroup;
         private Region region;
         private LogAnalyticsWorkspace logAnalyticsWorkspace;
+        // workload profile configuration
+        private EnvironmentType environmentType;
+        private List<WorkloadProfile> workloadProfiles;
     }
 }
