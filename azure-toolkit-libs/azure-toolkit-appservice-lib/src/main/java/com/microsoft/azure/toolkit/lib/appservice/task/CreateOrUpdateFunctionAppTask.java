@@ -38,6 +38,7 @@ import com.microsoft.azure.toolkit.lib.containerapps.AzureContainerApps;
 import com.microsoft.azure.toolkit.lib.containerapps.environment.ContainerAppsEnvironment;
 import com.microsoft.azure.toolkit.lib.containerapps.environment.ContainerAppsEnvironmentDraft;
 import com.microsoft.azure.toolkit.lib.containerapps.environment.ContainerAppsEnvironmentModule;
+import com.microsoft.azure.toolkit.lib.containerapps.model.EnvironmentType;
 import com.microsoft.azure.toolkit.lib.resource.AzureResources;
 import com.microsoft.azure.toolkit.lib.resource.ResourceGroup;
 import com.microsoft.azure.toolkit.lib.resource.task.CreateResourceGroupTask;
@@ -231,6 +232,7 @@ public class CreateOrUpdateFunctionAppTask extends AzureTask<FunctionAppBase<?, 
             config.setRegion(getNonStageRegion(functionAppConfig.region()));
             config.setResourceGroup(this.resourceGroup);
             config.setLogAnalyticsWorkspace(Optional.ofNullable(this.applicationInsight).map(ApplicationInsight::getWorkspace).orElse(null));
+            config.setEnvironmentType(EnvironmentType.WorkloadProfiles);
             draft.setConfig(config);
             return draft.commit();
         });
@@ -350,6 +352,7 @@ public class CreateOrUpdateFunctionAppTask extends AzureTask<FunctionAppBase<?, 
             draft.setDeploymentContainer(this.deploymentContainer);
             draft.setEnableDistributedTracing(functionAppConfig.enableDistributedTracing());
             draft.setStorageAccount(storageAccount);
+            draft.setContainerConfiguration(functionAppConfig.containerConfiguration());
             return draft.updateIfExist();
         });
     }

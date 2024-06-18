@@ -57,6 +57,9 @@ public class ConfigParser {
         return ContainerAppFunctionConfiguration.builder()
             .minReplicas(mojo.getMinReplicas())
             .maxReplicas(mojo.getMaxReplicas())
+            .workloadProfileMame(mojo.getWorkloadProfileMame())
+            .cpu(Optional.ofNullable(mojo.getCpu()).filter(StringUtils::isNotBlank).map(Double::valueOf).orElse(null))
+            .memory(mojo.getMemory())
             .build();
     }
 
