@@ -19,22 +19,26 @@ import org.apache.commons.lang3.StringUtils;
 @EqualsAndHashCode
 public class WorkloadProfile {
     public static final String CONSUMPTION = "Consumption";
-    public static final WorkloadProfile CONSUMPTION_PROFILE = WorkloadProfile.builder().name(CONSUMPTION).workloadProfileType(CONSUMPTION).build();
+    public static final WorkloadProfile CONSUMPTION_PROFILE = WorkloadProfile.builder().name(CONSUMPTION).type(WorkloadProfileType.CONSUMPTION_TYPE).build();
+
     private String name;
     /*
      * Workload profile type for the workloads to run on.
      */
-    private String workloadProfileType;
+    private WorkloadProfileType type;
 
     /*
      * The minimum capacity.
      */
     private Integer minimumCount;
-
     /*
      * The maximum capacity.
      */
     private Integer maximumCount;
+
+    public String getWorkloadProfileType() {
+        return type.getName();
+    }
 
     public static com.azure.resourcemanager.appcontainers.models.WorkloadProfile toWorkloadProfile(WorkloadProfile workloadProfile) {
         return new com.azure.resourcemanager.appcontainers.models.WorkloadProfile()
@@ -49,7 +53,7 @@ public class WorkloadProfile {
             return CONSUMPTION_PROFILE;
         }
         return WorkloadProfile.builder().name(workloadProfile.name())
-            .workloadProfileType(workloadProfile.workloadProfileType())
+            .type(WorkloadProfileType.builder().name(workloadProfile.workloadProfileType()).build())
             .maximumCount(workloadProfile.maximumCount())
             .minimumCount(workloadProfile.minimumCount()).build();
     }

@@ -21,6 +21,8 @@ import java.util.Optional;
 @AllArgsConstructor
 @EqualsAndHashCode
 public class WorkloadProfileType {
+    public static final WorkloadProfileType CONSUMPTION_TYPE = WorkloadProfileType.builder().name(WorkloadProfile.CONSUMPTION).build();
+
     private final String name;
     private final String category;
     private final String displayName;
