@@ -11,6 +11,7 @@ import com.azure.resourcemanager.appcontainers.models.BuildResource;
 import com.azure.resourcemanager.appcontainers.models.Configuration;
 import com.azure.resourcemanager.appcontainers.models.Container;
 import com.azure.resourcemanager.appcontainers.models.ContainerApps;
+import com.azure.resourcemanager.appcontainers.models.ContainerResources;
 import com.azure.resourcemanager.appcontainers.models.EnvironmentVar;
 import com.azure.resourcemanager.appcontainers.models.RegistryCredentials;
 import com.azure.resourcemanager.appcontainers.models.Scale;
@@ -34,8 +35,11 @@ import com.microsoft.azure.toolkit.lib.common.task.AzureTaskManager;
 import com.microsoft.azure.toolkit.lib.common.utils.Utils;
 import com.microsoft.azure.toolkit.lib.containerapps.environment.ContainerAppsEnvironment;
 import com.microsoft.azure.toolkit.lib.containerapps.environment.ContainerAppsEnvironmentDraft;
+import com.microsoft.azure.toolkit.lib.containerapps.model.EnvironmentType;
 import com.microsoft.azure.toolkit.lib.containerapps.model.IngressConfig;
+import com.microsoft.azure.toolkit.lib.containerapps.model.ResourceConfiguration;
 import com.microsoft.azure.toolkit.lib.containerapps.model.RevisionMode;
+import com.microsoft.azure.toolkit.lib.containerapps.model.WorkloadProfile;
 import com.microsoft.azure.toolkit.lib.containerregistry.AzureContainerRegistry;
 import com.microsoft.azure.toolkit.lib.containerregistry.AzureContainerRegistryModule;
 import com.microsoft.azure.toolkit.lib.containerregistry.ContainerRegistry;
@@ -110,16 +114,20 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         configuration.withSecrets(Optional.ofNullable(getSecret(imageConfig)).map(Collections::singletonList).orElse(Collections.emptyList()));
         configuration.withRegistries(Optional.ofNullable(getRegistryCredential(imageConfig)).map(Collections::singletonList).orElse(Collections.emptyList()));
         configuration.withIngress(Optional.ofNullable(ensureConfig().getIngressConfig()).map(IngressConfig::toIngress).orElse(null));
+        final ResourceConfiguration resourceConfiguration = ensureConfig().getResourceConfiguration();
         final Template template = new Template()
-            .withContainers(ImageConfig.toContainers(imageConfig))
+            .withContainers(ImageConfig.toContainers(imageConfig, resourceConfiguration))
             .withScale(ScaleConfig.toScale(this.getScaleConfig()));
         AzureMessager.getMessager().progress(AzureString.format("Creating Azure Container App({0})...", this.getName()));
+        final String workloadProfile = containerAppsEnvironment.getEnvironmentType() == EnvironmentType.ConsumptionOnly ? null :
+            Optional.ofNullable(getResourceConfiguration()).map(ResourceConfiguration::getWorkloadProfile).map(WorkloadProfile::getName).orElse(WorkloadProfile.CONSUMPTION);
         final com.azure.resourcemanager.appcontainers.models.ContainerApp result = client.define(ensureConfig().getName())
             .withRegion(com.azure.core.management.Region.fromName(containerAppsEnvironment.getRegion().getName()))
             .withExistingResourceGroup(Objects.requireNonNull(ensureConfig().getResourceGroup(), "Resource Group is required to create Container app.").getResourceGroupName())
             .withManagedEnvironmentId(containerAppsEnvironment.getId())
             .withConfiguration(configuration)
             .withTemplate(template)
+            .withWorkloadProfileName(workloadProfile)
             .create();
         final Action<ContainerApp> updateImage = AzureActionManager.getInstance().getAction(ContainerApp.UPDATE_IMAGE).bind(this);
         final Action<ContainerApp> browse = AzureActionManager.getInstance().getAction(ContainerApp.BROWSE).bind(this);
@@ -127,6 +135,7 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         return result;
     }
 
+    // todo: support update workload profile properties
     @Nonnull
     @Override
     @AzureOperation(name = "azure/containerapps.update_app.app", params = {"this.getName()"})
@@ -155,6 +164,7 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
             final List<RegistryCredentials> registries = Optional.ofNullable(origin.configuration().registries()).map(ArrayList::new).orElseGet(ArrayList::new);
             configuration.withRegistries(registries).withSecrets(secrets);
         }
+        // ["properties"]["template"]["containers"]
         if (isIngressConfigModified) {
             configuration.withIngress(ingressConfig.toIngress());
         }
@@ -366,6 +376,9 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         return Optional.ofNullable(config).map(Config::getIngressConfig).map(IngressConfig::isEnableIngress).orElseGet(super::isIngressEnabled);
     }
 
+    public ResourceConfiguration getResourceConfiguration() {
+        return Optional.ofNullable(config).map(Config::getResourceConfiguration).orElseGet(super::getResourceConfiguration);
+    }
 
     @Override
     public boolean isModified() {
@@ -386,6 +399,8 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         private IngressConfig ingressConfig;
         @Nullable
         private ScaleConfig scaleConfig;
+        @Nullable
+        private ResourceConfiguration resourceConfiguration;
     }
 
     @Setter
@@ -432,10 +447,21 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         }
 
         public static List<Container> toContainers(@Nonnull final ImageConfig config) {
+            return toContainers(config, null);
+        }
+
+        public static List<Container> toContainers(@Nonnull final ImageConfig config, @Nullable ResourceConfiguration resource) {
             final String imageId = config.getFullImageName();
             final String containerName = getContainerNameForImage(imageId);
             // drop old containers because we want to replace the old image
-            return Collections.singletonList(new Container().withName(containerName).withImage(imageId).withEnv(config.getEnvironmentVariables()));
+            final Container container = new Container().withName(containerName).withImage(imageId).withEnv(config.getEnvironmentVariables());
+            if (Objects.nonNull(resource)) {
+                final ContainerResources containerResources = new ContainerResources();
+                containerResources.withCpu(resource.getCpu());
+                containerResources.withMemory(resource.getMemory());
+                container.withResources(containerResources);
+            }
+            return Collections.singletonList(container);
         }
 
         private static String getContainerNameForImage(String containerImageName) {

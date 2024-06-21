@@ -48,7 +48,10 @@ import com.microsoft.azure.toolkit.lib.common.utils.UrlStreamingLog;
 import com.microsoft.azure.toolkit.lib.containerapps.AzureContainerApps;
 import com.microsoft.azure.toolkit.lib.containerapps.AzureContainerAppsServiceSubscription;
 import com.microsoft.azure.toolkit.lib.containerapps.containerapp.ContainerApp;
+import com.microsoft.azure.toolkit.lib.containerapps.model.EnvironmentType;
+import com.microsoft.azure.toolkit.lib.containerapps.model.WorkloadProfile;
 import lombok.SneakyThrows;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
@@ -122,6 +125,17 @@ public class ContainerAppsEnvironment extends AbstractAzResource<ContainerAppsEn
     @Override
     protected String loadStatus(@Nonnull ManagedEnvironment remote) {
         return remote.provisioningState().toString();
+    }
+
+    @Nullable
+    public EnvironmentType getEnvironmentType() {
+        return remoteOptional().map(remote -> CollectionUtils.isEmpty(remote.workloadProfiles()) ? EnvironmentType.ConsumptionOnly : EnvironmentType.WorkloadProfiles).orElse(null);
+    }
+
+    public List<WorkloadProfile> getWorkloadProfiles() {
+        return remoteOptional().map(ManagedEnvironment::workloadProfiles)
+            .map(profiles -> profiles.stream().map(WorkloadProfile::fromProfile).collect(Collectors.toList()))
+            .orElse(Collections.emptyList());
     }
 
     public String getLogStreamEndpoint() {

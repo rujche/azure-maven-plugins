@@ -22,6 +22,7 @@ import com.azure.resourcemanager.appservice.models.FunctionApp.Update;
 import com.azure.resourcemanager.appservice.models.ManagedServiceIdentity;
 import com.azure.resourcemanager.appservice.models.ManagedServiceIdentityType;
 import com.azure.resourcemanager.appservice.models.NameValuePair;
+import com.azure.resourcemanager.appservice.models.ResourceConfig;
 import com.azure.resourcemanager.appservice.models.UserAssignedIdentity;
 import com.azure.resourcemanager.authorization.AuthorizationManager;
 import com.azure.resourcemanager.authorization.models.BuiltInRole;
@@ -57,6 +58,7 @@ import com.microsoft.azure.toolkit.lib.common.model.Subscription;
 import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
 import com.microsoft.azure.toolkit.lib.common.operation.OperationContext;
 import com.microsoft.azure.toolkit.lib.containerapps.environment.ContainerAppsEnvironment;
+import com.microsoft.azure.toolkit.lib.containerapps.model.EnvironmentType;
 import com.microsoft.azure.toolkit.lib.storage.StorageAccount;
 import com.microsoft.azure.toolkit.lib.storage.blob.BlobContainer;
 import lombok.Data;
@@ -175,6 +177,18 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
             withCreate = newRuntime.getOperatingSystem() == OperatingSystem.DOCKER ?
                 defineDockerContainerImage(withImage) :
                 withImage.withBuiltInImage(((FunctionAppLinuxRuntime) newRuntime).toFunctionRuntimeStack(funcExtVersion));
+            // workload profile configurations
+            if (environment.getEnvironmentType() == EnvironmentType.WorkloadProfiles) {
+                final String profile = Optional.ofNullable(containerConfiguration).map(ContainerAppFunctionConfiguration::getWorkloadProfileMame).orElse(null);
+                final SiteInner siteInner = ((com.azure.resourcemanager.appservice.models.FunctionApp) withCreate).innerModel();
+                siteInner.withWorkloadProfileName(StringUtils.isBlank(profile) ? "Consumption" : profile); // if profile not set, use Consumption
+                if (Objects.nonNull(containerConfiguration) && ObjectUtils.anyNotNull(containerConfiguration.getCpu(), containerConfiguration.getMemory())) {
+                    final ResourceConfig resourceConfig = new ResourceConfig();
+                    resourceConfig.withCpu(containerConfiguration.getCpu());
+                    resourceConfig.withMemory(containerConfiguration.getMemory());
+                    siteInner.withResourceConfig(resourceConfig);
+                }
+            }
         } else {
             // normal function app
             final OperatingSystem os = newRuntime.isDocker() ? OperatingSystem.LINUX : newRuntime.getOperatingSystem();
@@ -372,6 +386,8 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
         final Runtime oldRuntime = origin.getRuntime();
         final AppServicePlan oldPlan = origin.getAppServicePlan();
         final FlexConsumptionConfiguration oldFlexConsumptionConfiguration = origin.getFlexConsumptionConfiguration();
+        final ContainerAppFunctionConfiguration oldContainerConfiguration = origin.getContainerConfiguration();
+        final ContainerAppFunctionConfiguration newContainerConfiguration = this.ensureConfig().getContainerConfiguration();
 
         final boolean planModified = Objects.nonNull(newPlan) && !Objects.equals(newPlan, oldPlan);
         final boolean dockerModified = Objects.nonNull(oldRuntime) && oldRuntime.isDocker() &&
@@ -384,8 +400,10 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
         final boolean isDiagnosticConfigModified = Objects.nonNull(newDiagnosticConfig) && !Objects.equals(newDiagnosticConfig, oldDiagnosticConfig);
         final boolean runtimeModified = !isFlexConsumption && (Objects.isNull(oldRuntime) || !oldRuntime.isDocker()) &&
             Objects.nonNull(newRuntime) && !Objects.equals(newRuntime, oldRuntime);
+        final boolean envConfigurationModified = isContainerHostingFunctionApp() && Objects.nonNull(newContainerConfiguration) &&
+            !Objects.equals(oldContainerConfiguration, newContainerConfiguration);
         final boolean modified = planModified || runtimeModified || dockerModified || flexConsumptionModified ||
-            isAppSettingsModified || Objects.nonNull(newDiagnosticConfig) || Objects.nonNull(storageAccount);
+            isAppSettingsModified || Objects.nonNull(newDiagnosticConfig) || Objects.nonNull(storageAccount) || envConfigurationModified;
         final String funcExtVersion = Optional.of(settingsToAdd).map(map -> map.get(FUNCTIONS_EXTENSION_VERSION))
             .orElseGet(() -> oldAppSettings.get(FUNCTIONS_EXTENSION_VERSION));
         if (modified) {
@@ -406,12 +424,28 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
                     // todo: update identity configuration once service supports identity authentication,
                     // return updateFlexFunctionAppIdentityConfiguration(app, Objects.requireNonNull(newFlexConsumptionConfiguration));
                 } else {
-                    return update.apply();
+                    final com.azure.resourcemanager.appservice.models.FunctionApp result = update.apply();
+                    if (envConfigurationModified) {
+                        final Update containerUpdate = result.update();
+                        Optional.ofNullable(newContainerConfiguration).ifPresent(c -> updateContainerFunctionConfiguration(containerUpdate, c));
+                        return ((DefinitionStages.WithCreate) containerUpdate).create();
+                    }
+                    return result;
                 }
             }, Status.CREATING));
             messager.success(AzureString.format("Function App({0}) is successfully updated", remote.name()));
         }
         return remote;
+    }
+
+    private void updateContainerFunctionConfiguration(final Update update, final ContainerAppFunctionConfiguration c) {
+        Optional.ofNullable(c.getMaxReplicas()).ifPresent(update::withMaxReplicas);
+        Optional.ofNullable(c.getMinReplicas()).ifPresent(update::withMinReplicas);
+        final SiteInner siteInner = ((com.azure.resourcemanager.appservice.models.FunctionApp) update).innerModel();
+        Optional.ofNullable(c.getWorkloadProfileMame()).filter(StringUtils::isNotBlank).ifPresent(siteInner::withWorkloadProfileName);
+        final ResourceConfig resourceConfig = Optional.ofNullable(siteInner.resourceConfig()).orElseGet(ResourceConfig::new);
+        Optional.ofNullable(c.getCpu()).ifPresent(resourceConfig::withCpu);
+        Optional.ofNullable(c.getMemory()).ifPresent(resourceConfig::withMemory);
     }
 
     private boolean isFlexConsumptionModified(final FlexConsumptionConfiguration oldConfiguration, final FlexConsumptionConfiguration newConfiguration) {

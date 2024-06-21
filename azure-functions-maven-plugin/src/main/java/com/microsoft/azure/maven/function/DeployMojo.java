@@ -197,6 +197,30 @@ public class DeployMojo extends AbstractFunctionMojo {
     @Parameter(property = "httpInstanceConcurrency")
     protected Integer httpInstanceConcurrency;
 
+    /**
+     * The CPU in cores of the container host function app. e.g 0.75. Only works for container host function app
+     */
+    @JsonProperty
+    @Getter
+    @Parameter(property = "cpu")
+    protected String cpu;
+
+    /**
+     * The memory size of the container host function app. e.g. 1.0Gi. Only works for container host function app
+     */
+    @JsonProperty
+    @Getter
+    @Parameter(property = "memory")
+    protected String memory;
+
+    /**
+     * The workload profile name to run the function app on.
+     */
+    @JsonProperty
+    @Getter
+    @Parameter(property = "workloadProfileName")
+    protected String workloadProfileName;
+
     @Override
     @AzureOperation("user/functionapp.deploy_app")
     protected void doExecute() throws Throwable {
@@ -235,10 +259,31 @@ public class DeployMojo extends AbstractFunctionMojo {
         validateFunctionCompatibility();
         validateArtifactCompileVersion();
         validateApplicationInsightsConfiguration();
+        validateContainerHostFunctionConfiguration();
         if (Objects.equals(PricingTier.fromString(getPricingTier()), PricingTier.FLEX_CONSUMPTION)) {
             validateFlexConsumptionConfiguration();
         }
         // validate container apps hosting of function app
+    }
+
+    private void validateContainerHostFunctionConfiguration() {
+        // validate memory schema
+        if (StringUtils.isBlank(this.memory) && StringUtils.isNoneBlank(this.cpu)) {
+            throw new AzureToolkitRuntimeException("The <memory> argument is required with <cpu>. Please provide both or none.");
+        }
+        if (StringUtils.isBlank(this.cpu) && StringUtils.isNoneBlank(this.memory)) {
+            throw new AzureToolkitRuntimeException("The <cpu> argument is required with <memory>. Please provide both or none.");
+        }
+        if (StringUtils.isNotBlank(this.memory)) {
+            if (!StringUtils.endsWithIgnoreCase(this.memory, "gi")) {
+                throw new AzureToolkitRuntimeException("The value of <memory> should end with Gi. Please provide a correct value. e.g. 4.0Gi.");
+            }
+            try {
+                Double.valueOf(StringUtils.removeEndIgnoreCase(this.memory, "gi"));
+            } catch (final NumberFormatException nfe) {
+                throw new AzureToolkitRuntimeException("The value of <memory> is not valid. Please provide a correct value. e.g. 4.0Gi.");
+            }
+        }
     }
 
     private void validateFlexConsumptionConfiguration() {

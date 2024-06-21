@@ -26,7 +26,9 @@ import com.microsoft.azure.toolkit.lib.containerapps.AzureContainerApps;
 import com.microsoft.azure.toolkit.lib.containerapps.AzureContainerAppsServiceSubscription;
 import com.microsoft.azure.toolkit.lib.containerapps.environment.ContainerAppsEnvironment;
 import com.microsoft.azure.toolkit.lib.containerapps.model.IngressConfig;
+import com.microsoft.azure.toolkit.lib.containerapps.model.ResourceConfiguration;
 import com.microsoft.azure.toolkit.lib.containerapps.model.RevisionMode;
+import com.microsoft.azure.toolkit.lib.containerapps.model.WorkloadProfile;
 import com.microsoft.azure.toolkit.lib.containerregistry.AzureContainerRegistry;
 import com.microsoft.azure.toolkit.lib.containerregistry.ContainerRegistry;
 import com.microsoft.azure.toolkit.lib.servicelinker.ServiceLinkerConsumer;
@@ -50,6 +52,8 @@ public class ContainerApp extends AbstractAzResource<ContainerApp, AzureContaine
 
     public static final String LOG_TYPE_CONSOLE = "console";
     public static final String LOG_TYPE_SYSTEM = "system";
+    public static final String RAW_REQUEST_URL = "subscriptions/%s/resourceGroups/%s/providers/Microsoft.App/containerApps/%s?api-version=%s";
+    public static final String DEVELOPMENT_STACK_API_VERSION = "2024-02-02-preview";
     @Getter
     private final RevisionModule revisionModule;
     private Revision latestRevision = null;
@@ -286,5 +290,18 @@ public class ContainerApp extends AbstractAzResource<ContainerApp, AzureContaine
     @Override
     public ServiceLinkerModule getServiceLinkerModule() {
         return linkerModule;
+    }
+
+    @Nullable
+    public ResourceConfiguration getResourceConfiguration() {
+        final ContainerAppsEnvironment managedEnvironment = getManagedEnvironment();
+        final com.azure.resourcemanager.appcontainers.models.ContainerApp remote = getRemote();
+        if (Objects.isNull(managedEnvironment) || Objects.isNull(remote)) {
+            return null;
+        }
+        final WorkloadProfile workloadProfile = managedEnvironment.getWorkloadProfiles().stream()
+            .filter(p -> StringUtils.equalsIgnoreCase(p.getName(), remote.workloadProfileName()))
+            .findFirst().orElse(null);
+        return ResourceConfiguration.builder().workloadProfile(workloadProfile).build();
     }
 }
