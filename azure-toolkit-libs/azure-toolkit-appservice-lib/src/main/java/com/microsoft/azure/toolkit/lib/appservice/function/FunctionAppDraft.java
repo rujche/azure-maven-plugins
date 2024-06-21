@@ -415,7 +415,6 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
             Optional.ofNullable(newDockerConfig).filter(ignore -> dockerModified).ifPresent(p -> updateDockerConfiguration(update, p));
             Optional.ofNullable(newDiagnosticConfig).filter(ignore -> isDiagnosticConfigModified).filter(ignore -> StringUtils.isBlank(getEnvironmentId())).ifPresent(c -> AppServiceUtils.updateDiagnosticConfigurationForWebAppBase(update, c));
             Optional.ofNullable(newFlexConsumptionConfiguration).filter(ignore -> flexConsumptionModified).ifPresent(c -> update.withContainerSize(c.getInstanceSize()));
-            Optional.ofNullable(newContainerConfiguration).filter(ignore -> envConfigurationModified).ifPresent(c -> updateContainerFunctionConfiguration(update, c));
             Optional.ofNullable(storageAccount).ifPresent(s -> update.withExistingStorageAccount(s.getRemote()));
             final IAzureMessager messager = AzureMessager.getMessager();
             messager.info(AzureString.format("Start updating Function App({0})...", remote.name()));
@@ -425,7 +424,13 @@ public class FunctionAppDraft extends FunctionApp implements AzResource.Draft<Fu
                     // todo: update identity configuration once service supports identity authentication,
                     // return updateFlexFunctionAppIdentityConfiguration(app, Objects.requireNonNull(newFlexConsumptionConfiguration));
                 } else {
-                    return update.apply();
+                    final com.azure.resourcemanager.appservice.models.FunctionApp result = update.apply();
+                    if (envConfigurationModified) {
+                        final Update containerUpdate = result.update();
+                        Optional.ofNullable(newContainerConfiguration).ifPresent(c -> updateContainerFunctionConfiguration(containerUpdate, c));
+                        return ((DefinitionStages.WithCreate) containerUpdate).create();
+                    }
+                    return result;
                 }
             }, Status.CREATING));
             messager.success(AzureString.format("Function App({0}) is successfully updated", remote.name()));
