@@ -21,7 +21,7 @@ public class AzureTelemetryClientTest extends AzureTelemetryClient {
             put("fake-slack-token", "xoxp-FAKE"); // [SuppressMessage("Microsoft.Security", "CS001:SecretInline", Justification="fake credential for test case")]
             put("fake-path", "/Users/username/.AzureToolkitforIntelliJ/extensions");
             put("fake-github-token", "ghp_000000000000000000000000000000000000"); // [SuppressMessage("Microsoft.Security", "CS001:SecretInline", Justification="fake credential for test case")]
-            put("fake-cli-credential", "login.exe -adminpassword FAKE"); // [SuppressMessage("Microsoft.Security", "CS001:SecretInline", Justification="fake credential for test case")]
+            put("fake-cli-credential", "login.exe -adminp FAKE"); // [SuppressMessage("Microsoft.Security", "CS001:SecretInline", Justification="fake credential for test case")]
         }};
         AzureTelemetryClientTest.anonymizePersonallyIdentifiableInformation(map);
         assert StringUtils.equals(map.get("fake-password"), "<REDACTED: Generic Secret>");
