@@ -132,6 +132,10 @@ public class ContainerAppDraft extends ContainerApp implements AzResource.Draft<
         final Action<ContainerApp> updateImage = AzureActionManager.getInstance().getAction(ContainerApp.UPDATE_IMAGE).bind(this);
         final Action<ContainerApp> browse = AzureActionManager.getInstance().getAction(ContainerApp.BROWSE).bind(this);
         AzureMessager.getMessager().success(AzureString.format("Azure Container App({0}) is successfully created.", this.getName()), browse, updateImage);
+
+        final Action<String> learnMore = AzureActionManager.getInstance().getAction(Action.OPEN_URL).withLabel("Learn More").bind("https://aka.ms/azuretools-aca-stack");
+        final Action<String> openPortal = AzureActionManager.getInstance().getAction(Action.OPEN_URL).withLabel("Open Portal").bind(this.getPortalUrl());
+        AzureMessager.getMessager().info("Azure container apps offers an automatic memory fitting experience for Java developers. To take advantage of this Java-optimized feature, please set your development stack to `Java` in the portal.", learnMore, openPortal);
         return result;
     }
 
