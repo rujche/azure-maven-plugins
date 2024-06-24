@@ -274,6 +274,13 @@ public class DeployMojo extends AbstractFunctionMojo {
         if (StringUtils.isBlank(this.cpu) && StringUtils.isNoneBlank(this.memory)) {
             throw new AzureToolkitRuntimeException("The <cpu> argument is required with <memory>. Please provide both or none.");
         }
+        if (StringUtils.isNoneBlank(this.cpu)) {
+            try {
+                Double.valueOf(this.cpu);
+            } catch (final NumberFormatException nfe) {
+                throw new AzureToolkitRuntimeException("The value of <cpu> is not valid. Please provide a correct value. e.g. 2.0.");
+            }
+        }
         if (StringUtils.isNotBlank(this.memory)) {
             if (!StringUtils.endsWithIgnoreCase(this.memory, "gi")) {
                 throw new AzureToolkitRuntimeException("The value of <memory> should end with Gi. Please provide a correct value. e.g. 4.0Gi.");
