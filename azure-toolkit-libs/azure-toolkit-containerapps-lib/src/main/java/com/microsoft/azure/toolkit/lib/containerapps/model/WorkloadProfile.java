@@ -12,6 +12,8 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.Optional;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -37,7 +39,7 @@ public class WorkloadProfile {
     private Integer maximumCount;
 
     public String getWorkloadProfileType() {
-        return type.getName();
+        return Optional.ofNullable(type).map(WorkloadProfileType::getName).orElse(null);
     }
 
     public static com.azure.resourcemanager.appcontainers.models.WorkloadProfile toWorkloadProfile(WorkloadProfile workloadProfile) {
