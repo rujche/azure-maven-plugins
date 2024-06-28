@@ -140,7 +140,9 @@ public interface Runtime {
                 message = AzureString.format("The runtime of your app \"%s\" is preview, please be careful to use it in production environment." + link, runtime.toString());
             } else if (Objects.nonNull(runtime.getEndOfLifeDate())) {
                 if (runtime.getEndOfLifeDate().isAfter(OffsetDateTime.now())) {
-                    message = AzureString.format("The runtime of your app \"%s\" will reach EOL on %s and will no longer be supported, please upgrade it." + link, runtime.toString(), runtime.getEndOfLifeDate().format(DateTimeFormatter.ISO_LOCAL_DATE));
+                    if(runtime.getEndOfLifeDate().minusMonths(6).isBefore(OffsetDateTime.now())){
+                        message = AzureString.format("The runtime of your app \"%s\" will reach EOL on %s and will no longer be supported, please upgrade it." + link, runtime.toString(), runtime.getEndOfLifeDate().format(DateTimeFormatter.ISO_LOCAL_DATE));
+                    }
                 } else {
                     message = AzureString.format("The runtime of your app \"%s\" has reached EOL on %s and is no longer supported, please upgrade it." + link,
                         runtime.toString(), runtime.getEndOfLifeDate().format(DateTimeFormatter.ISO_LOCAL_DATE));
