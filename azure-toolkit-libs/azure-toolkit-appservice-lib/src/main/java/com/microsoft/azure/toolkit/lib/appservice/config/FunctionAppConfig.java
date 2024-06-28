@@ -7,6 +7,7 @@ package com.microsoft.azure.toolkit.lib.appservice.config;
 import com.microsoft.azure.toolkit.lib.appservice.model.ApplicationInsightsConfig;
 import com.microsoft.azure.toolkit.lib.appservice.model.ContainerAppFunctionConfiguration;
 import com.microsoft.azure.toolkit.lib.appservice.model.FlexConsumptionConfiguration;
+import com.microsoft.azure.toolkit.lib.containerapps.environment.ContainerAppsEnvironmentDraft;
 import com.microsoft.azure.toolkit.lib.monitor.LogAnalyticsWorkspaceConfig;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
@@ -32,11 +33,23 @@ public class FunctionAppConfig extends AppServiceConfig {
     private String storageAccountName;
     private String storageAccountResourceGroup;
     private String environment;
+    private ContainerAppsEnvironmentDraft.Config environmentConfig;
     private ContainerAppFunctionConfiguration containerConfiguration;
     private LogAnalyticsWorkspaceConfig workspaceConfig;
     private Boolean enableDistributedTracing;
     private ApplicationInsightsConfig applicationInsightsConfig;
     private FlexConsumptionConfiguration flexConsumptionConfiguration;
+
+    public String environment() {
+        return Optional.ofNullable(environmentConfig).map(ContainerAppsEnvironmentDraft.Config::getName).orElse(environment);
+    }
+
+    public FunctionAppConfig environment(final String environment) {
+        this.environment = environment;
+        this.environmentConfig = new ContainerAppsEnvironmentDraft.Config();
+        this.environmentConfig.setName(environment);
+        return this;
+    }
 
     public boolean disableAppInsights() {
         return Optional.ofNullable(applicationInsightsConfig)

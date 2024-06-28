@@ -67,7 +67,7 @@ public class ConfigurationPrompter {
             }
         }
         for (final String resourceName : resourceNames) {
-            final ObjectNode resourceSchema = (ObjectNode) JsonLoader.fromResource("/schema/" + resourceName + ".json");
+            final ObjectNode resourceSchema = (ObjectNode) JsonLoader.fromResource("/schema/com/microsoft/azure/toolkit/" + resourceName + ".json");
             if (!resourceSchema.has("properties")) {
                 throw new InvalidConfigurationException(String.format("Bad schema for %s: missing properties field.", resourceName));
             }

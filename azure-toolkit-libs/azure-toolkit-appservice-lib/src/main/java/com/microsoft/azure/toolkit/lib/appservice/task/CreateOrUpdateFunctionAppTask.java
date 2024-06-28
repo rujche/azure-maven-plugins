@@ -39,6 +39,7 @@ import com.microsoft.azure.toolkit.lib.containerapps.environment.ContainerAppsEn
 import com.microsoft.azure.toolkit.lib.containerapps.environment.ContainerAppsEnvironmentDraft;
 import com.microsoft.azure.toolkit.lib.containerapps.environment.ContainerAppsEnvironmentModule;
 import com.microsoft.azure.toolkit.lib.containerapps.model.EnvironmentType;
+import com.microsoft.azure.toolkit.lib.monitor.LogAnalyticsWorkspace;
 import com.microsoft.azure.toolkit.lib.resource.AzureResources;
 import com.microsoft.azure.toolkit.lib.resource.ResourceGroup;
 import com.microsoft.azure.toolkit.lib.resource.task.CreateResourceGroupTask;
@@ -51,6 +52,7 @@ import com.microsoft.azure.toolkit.lib.storage.blob.BlobContainerDraft;
 import com.microsoft.azure.toolkit.lib.storage.model.Kind;
 import com.microsoft.azure.toolkit.lib.storage.model.Redundancy;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 
@@ -227,12 +229,13 @@ public class CreateOrUpdateFunctionAppTask extends AzureTask<FunctionAppBase<?, 
                 return environment;
             }
             final ContainerAppsEnvironmentDraft draft = environments.create(environmentName, resourceGroupName);
-            final ContainerAppsEnvironmentDraft.Config config = new ContainerAppsEnvironmentDraft.Config();
-            config.setName(environmentName);
-            config.setRegion(getNonStageRegion(functionAppConfig.region()));
-            config.setResourceGroup(this.resourceGroup);
-            config.setLogAnalyticsWorkspace(Optional.ofNullable(this.applicationInsight).map(ApplicationInsight::getWorkspace).orElse(null));
-            config.setEnvironmentType(EnvironmentType.WorkloadProfiles);
+            final ContainerAppsEnvironmentDraft.Config config = functionAppConfig.environmentConfig();
+            config.setName(ObjectUtils.firstNonNull(config.getName(), environmentName));
+            config.setRegion(ObjectUtils.firstNonNull(config.getRegion(), getNonStageRegion(functionAppConfig.region())));
+            config.setResourceGroup(ObjectUtils.firstNonNull(config.getResourceGroup(), this.resourceGroup));
+            final LogAnalyticsWorkspace logAnalyticsWorkspace = Optional.ofNullable(this.applicationInsight).map(ApplicationInsight::getWorkspace).orElse(null);
+            config.setLogAnalyticsWorkspace(ObjectUtils.firstNonNull(config.getLogAnalyticsWorkspace(), logAnalyticsWorkspace));
+            config.setEnvironmentType(ObjectUtils.firstNonNull(config.getEnvironmentType(), EnvironmentType.WorkloadProfiles));
             draft.setConfig(config);
             return draft.commit();
         });
