@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -54,8 +55,6 @@ public class AzureTelemetryClient {
         put(CLI_CREDENTIALS_REGEX, "<REDACTED: CLI Credentials>");
     }};
 
-    @Nonnull
-    private final TelemetryClient client = new TelemetryClient();
     @Getter
     @Setter(AccessLevel.PACKAGE)
     private String eventNamePrefix;
@@ -129,8 +128,10 @@ public class AzureTelemetryClient {
         final Map<String, String> properties = mergeProperties(getDefaultProperties(), customProperties, overrideDefaultProperties);
         properties.entrySet().removeIf(stringStringEntry -> StringUtils.isEmpty(stringStringEntry.getValue())); // filter out null values
         anonymizePersonallyIdentifiableInformation(properties);
-        client.trackEvent(eventName, properties, metrics);
-        client.flush();
+        Optional.ofNullable(getClient()).ifPresent(client -> {
+            client.trackEvent(eventName, properties, metrics);
+            client.flush();
+        });
     }
 
     protected Map<String, String> mergeProperties(Map<String, String> defaultProperties,
@@ -168,5 +169,14 @@ public class AzureTelemetryClient {
             }
         }
         return result;
+    }
+
+    @Nullable
+    private TelemetryClient getClient() {
+        return isEnabled() ? ClientHolder.client : null;
+    }
+
+    private static class ClientHolder {
+        private static final TelemetryClient client = new TelemetryClient();
     }
 }
