@@ -14,7 +14,7 @@ The build tool can be configured in a project Maven POM file as such:
     <plugins>
         <plugin>
             <groupId>com.microsoft.azure</groupId>
-            <artifactId>azure-sdk-build-tool</artifactId>
+            <artifactId>azure-sdk-build-tool-maven-plugin</artifactId>
             <version>{latest_version}</version>
             <configuration>
             ...
