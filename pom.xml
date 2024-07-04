@@ -53,7 +53,7 @@
         <module>azure-sfmesh-maven-plugin</module>
         <module>azure-spring-apps-maven-plugin</module>
         <module>azure-appservice-maven-plugin-lib</module>
-        <module>azure-sdk-build-tool</module>
+        <module>azure-sdk-build-tool-maven-plugin</module>
     </modules>
 
     <properties>

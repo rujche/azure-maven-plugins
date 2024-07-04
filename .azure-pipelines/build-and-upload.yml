@@ -95,8 +95,8 @@ extends:
                     fi
                     
                     if [ "$BuildAzureSdkPlugin" == "true" ]; then
-                        cp ./.repository/com/microsoft/azure/azure-sdk-build-tool/*/*.jar ./.release
-                        cp ./.repository/com/microsoft/azure/azure-sdk-build-tool/*/*.pom ./.release
+                        cp ./.repository/com/microsoft/azure/azure-sdk-build-tool-maven-plugin/*/*.jar ./.release
+                        cp ./.repository/com/microsoft/azure/azure-sdk-build-tool-maven-plugin/*/*.pom ./.release
                     fi
 
                     if [ "$BuildMavenPom" == "true" ]; then

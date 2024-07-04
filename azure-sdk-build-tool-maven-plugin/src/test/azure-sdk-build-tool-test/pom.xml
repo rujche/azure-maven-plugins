@@ -81,7 +81,7 @@
         <plugins>
             <plugin>
                 <groupId>com.microsoft.azure</groupId>
-                <artifactId>azure-sdk-build-tool</artifactId>
+                <artifactId>azure-sdk-build-tool-maven-plugin</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
                 <configuration>
                     <validateAzureSdkBomUsed>true</validateAzureSdkBomUsed>
