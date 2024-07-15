@@ -21,7 +21,9 @@ import com.microsoft.azure.toolkit.lib.common.model.AbstractAzServiceSubscriptio
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class AzureManagedIdentity extends AbstractAzService<AzureManagedIdentitySubscription, MsiManager> {
     public AzureManagedIdentity() {
@@ -55,6 +57,11 @@ public class AzureManagedIdentity extends AbstractAzService<AzureManagedIdentity
             .withPolicy(AbstractAzServiceSubscription.getUserAgentPolicy())
             .withPolicy(new ProviderRegistrationPolicy(providers)) // add policy to auto register resource providers
             .authenticate(account.getTokenCredential(subscriptionId), azureProfile);
+    }
+
+    @Nonnull
+    public List<Identity> identities() {
+        return this.list().stream().flatMap(m -> m.identity().list().stream()).collect(Collectors.toList());
     }
 
     @Nonnull

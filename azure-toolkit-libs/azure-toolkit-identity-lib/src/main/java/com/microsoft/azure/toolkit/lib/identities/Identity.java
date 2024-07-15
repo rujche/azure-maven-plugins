@@ -11,6 +11,7 @@ import com.microsoft.azure.toolkit.lib.common.model.AbstractAzResourceModule;
 import com.microsoft.azure.toolkit.lib.common.model.Deletable;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.Collections;
 import java.util.List;
 
@@ -37,8 +38,21 @@ public class Identity extends AbstractAzResource<Identity, AzureManagedIdentityS
         return Status.RUNNING;
     }
 
-    // list all role assignments
+    @Nullable
+    public String getTenantId(){
+        return remoteOptional().map(com.azure.resourcemanager.msi.models.Identity::tenantId).orElse(null);
+    }
 
+    @Nullable
+    public String getPrincipalId(){
+        return remoteOptional().map(com.azure.resourcemanager.msi.models.Identity::principalId).orElse(null);
+    }
+
+    @Nullable
+    public String getClientId(){
+        return remoteOptional().map(com.azure.resourcemanager.msi.models.Identity::clientId).orElse(null);
+    }
+    // list all role assignments
     // list role assignments for a specific resource
 }
 

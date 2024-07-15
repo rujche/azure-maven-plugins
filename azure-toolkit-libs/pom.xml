@@ -499,6 +499,11 @@
                 <version>${azure-resourcemanager-cognitiveservices.version}</version>
             </dependency>
             <dependency>
+                <groupId>com.azure.resourcemanager</groupId>
+                <artifactId>azure-resourcemanager-authorization</artifactId>
+                <version>${azure.resourcemanager.version}</version>
+            </dependency>
+            <dependency>
                 <groupId>com.microsoft.rest</groupId>
                 <artifactId>client-runtime</artifactId>
                 <version>${azure-arm-client-runtime.version}</version>

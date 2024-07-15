@@ -27,6 +27,10 @@
             <artifactId>azure-resourcemanager-msi</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.azure.resourcemanager</groupId>
+            <artifactId>azure-resourcemanager-authorization</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.microsoft.azure</groupId>
             <artifactId>azure-toolkit-auth-lib</artifactId>
         </dependency>
