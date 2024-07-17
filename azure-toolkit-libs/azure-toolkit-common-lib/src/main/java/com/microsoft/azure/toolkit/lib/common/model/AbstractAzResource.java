@@ -408,6 +408,12 @@ public abstract class AbstractAzResource<T extends AbstractAzResource<T, P, R>, 
             .collect(Collectors.toList());
     }
 
+    public List<String> getPermissions(final String identity) {
+        return getRoleDefinitions(identity).stream()
+            .flatMap(rd -> rd.permissions().stream())
+            .flatMap(p -> p.actions().stream()).collect(Collectors.toList());
+    }
+
     // todo: add cache for different subscriptions
     // todo: resource could overwrite this implementation so that they could re-use the same authorization manager from their service client
     @Nonnull
