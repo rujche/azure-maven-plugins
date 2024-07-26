@@ -43,6 +43,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 @ToString(onlyExplicitlyIncluded = true)
@@ -411,7 +412,7 @@ public abstract class AbstractAzResource<T extends AbstractAzResource<T, P, R>, 
     public List<String> getPermissions(final String identity) {
         return getRoleDefinitions(identity).stream()
             .flatMap(rd -> rd.permissions().stream())
-            .flatMap(p -> p.actions().stream()).collect(Collectors.toList());
+            .flatMap(p -> Stream.of(p.actions(), p.notActions(), p.dataActions(), p.notDataActions()).flatMap(List::stream)).collect(Collectors.toList());
     }
 
     // todo: add cache for different subscriptions
