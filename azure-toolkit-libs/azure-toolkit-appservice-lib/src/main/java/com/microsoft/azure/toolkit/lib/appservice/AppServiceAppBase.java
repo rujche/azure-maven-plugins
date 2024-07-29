@@ -46,7 +46,6 @@ import com.microsoft.azure.toolkit.lib.identities.ManagedIdentitySupport;
 import com.microsoft.azure.toolkit.lib.identities.model.IdentityConfiguration;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.jetbrains.annotations.NotNull;
 import reactor.core.publisher.Flux;
 
 import javax.annotation.Nonnull;
@@ -277,7 +276,7 @@ public abstract class AppServiceAppBase<
     }
 
     @Override
-    public void updateIdentityConfiguration(@NotNull final IdentityConfiguration configuration) {
+    public void updateIdentityConfiguration(@Nonnull final IdentityConfiguration configuration) {
         throw new AzureToolkitRuntimeException("not supported");
     }
 }
