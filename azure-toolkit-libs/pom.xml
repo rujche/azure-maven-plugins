@@ -59,6 +59,7 @@
         <module>azure-toolkit-servicelinker-lib</module>
         <module>azure-toolkit-cognitiveservices-lib</module>
         <module>azure-toolkit-keyvault-lib</module>
+        <module>azure-toolkit-identity-lib</module>
     </modules>
 
     <properties>
@@ -293,6 +294,11 @@
                 <artifactId>azure-toolkit-keyvault-lib</artifactId>
                 <version>${azure.toolkit-lib.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.microsoft.azure</groupId>
+                <artifactId>azure-toolkit-identity-lib</artifactId>
+                <version>${azure.toolkit-lib.version}</version>
+            </dependency>
             <!-- azure data management sdk -->
             <dependency>
                 <groupId>com.azure</groupId>
@@ -381,6 +387,11 @@
                 <groupId>com.azure.resourcemanager</groupId>
                 <artifactId>azure-resourcemanager-appservice</artifactId>
                 <version>2.39.0</version>
+            </dependency>
+            <dependency>
+                <groupId>com.azure.resourcemanager</groupId>
+                <artifactId>azure-resourcemanager-msi</artifactId>
+                <version>${azure.resourcemanager.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.azure.resourcemanager</groupId>
@@ -486,6 +497,11 @@
                 <groupId>com.azure.resourcemanager</groupId>
                 <artifactId>azure-resourcemanager-cognitiveservices</artifactId>
                 <version>${azure-resourcemanager-cognitiveservices.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.azure.resourcemanager</groupId>
+                <artifactId>azure-resourcemanager-authorization</artifactId>
+                <version>${azure.resourcemanager.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.microsoft.rest</groupId>

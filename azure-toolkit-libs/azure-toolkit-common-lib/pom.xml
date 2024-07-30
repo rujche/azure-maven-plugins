@@ -103,6 +103,10 @@
             <artifactId>azure-resourcemanager-resources</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.azure.resourcemanager</groupId>
+            <artifactId>azure-resourcemanager-authorization</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.microsoft.azure</groupId>
             <artifactId>applicationinsights-core</artifactId>
         </dependency>
