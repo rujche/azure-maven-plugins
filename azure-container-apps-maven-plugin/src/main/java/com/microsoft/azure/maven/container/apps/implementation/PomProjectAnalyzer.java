@@ -32,8 +32,9 @@ public class PomProjectAnalyzer {
             dependencyGroupIds.add(dependency.getGroupId());
         }
         for (final String module : project.getModules()) {
-            modules.add(new PomProjectAnalyzer(String.format("%s/%s/pom.xml",
-                pomFilePath.substring(0, pomFilePath.lastIndexOf("/")), module)));
+            String parentPath = pomFilePath.lastIndexOf("/") == -1
+                ? "." : pomFilePath.substring(0, pomFilePath.lastIndexOf("/"));
+            modules.add(new PomProjectAnalyzer(String.format("%s/%s/pom.xml", parentPath, module)));
         }
     }
 
