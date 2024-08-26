@@ -16,12 +16,12 @@ import java.util.Properties;
 public class OrchestrateMojo extends CreateProjectFromArchetypeMojo {
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        updateSuperFields();
+        setParentFields();
         updateUserProperties();
         super.execute();
     }
 
-    private void updateSuperFields() {
+    private void setParentFields() {
         setParentPrivateField("archetypeGroupId", "com.azure");
         setParentPrivateField("archetypeArtifactId", "azure-runtime-maven-tools");
         setParentPrivateField("archetypeVersion", "1.0-SNAPSHOT");
