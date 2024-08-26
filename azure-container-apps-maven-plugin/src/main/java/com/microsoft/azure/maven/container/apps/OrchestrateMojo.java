@@ -57,6 +57,7 @@ public class OrchestrateMojo extends CreateProjectFromArchetypeMojo {
         properties.setProperty("artifactId", "app-host");
         properties.setProperty("version", "1.0.0-SNAPSHOT");
         properties.setProperty("package", "jar");
+        properties.setProperty("packageInPathFormat", "com.microsoft.azure.container.apps.maven.plugin.generated.app.host");
     }
 
     private void setArchetypeRelatedProperties(Properties properties) {
