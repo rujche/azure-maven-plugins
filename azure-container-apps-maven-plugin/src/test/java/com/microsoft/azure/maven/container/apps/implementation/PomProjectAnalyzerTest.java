@@ -15,6 +15,7 @@ public class PomProjectAnalyzerTest {
         PomProjectAnalyzer analyzer = new PomProjectAnalyzer("src/test/resources/pom-project-analyzer/pom.xml");
         assertFalse(analyzer.containsDependency("not-exist", "not-exist"));
         assertTrue(analyzer.containsDependency("org.springframework.boot", "spring-boot-starter-data-mongodb"));
+        assertTrue(analyzer.containsDependencyWithGroupId("org.springframework.boot"));
     }
 
 }

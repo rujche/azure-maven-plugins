@@ -16,10 +16,12 @@ import java.util.Set;
 public class PomProjectAnalyzer {
 
     private final Set<String> dependencies;
+    private final Set<String> dependencyGroupIds;
     private final List<PomProjectAnalyzer> modules;
 
     public PomProjectAnalyzer(String pomFilePath) throws IOException, XmlPullParserException {
         this.dependencies = new HashSet<>();
+        this.dependencyGroupIds = new HashSet<>();
         this.modules = new ArrayList<>();
         FileReader reader = new FileReader(pomFilePath);
         MavenXpp3Reader mavenReader = new MavenXpp3Reader();
@@ -27,6 +29,7 @@ public class PomProjectAnalyzer {
         MavenProject project = new MavenProject(model);
         for (final Dependency dependency : project.getDependencies()) {
             dependencies.add(createDependencyString(dependency.getGroupId(), dependency.getArtifactId()));
+            dependencyGroupIds.add(dependency.getGroupId());
         }
         for (final String module : project.getModules()) {
             modules.add(new PomProjectAnalyzer(String.format("%s/%s/pom.xml",
@@ -40,6 +43,18 @@ public class PomProjectAnalyzer {
         }
         for (final PomProjectAnalyzer module : modules) {
             if (module.containsDependency(groupId, artifactId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean containsDependencyWithGroupId(String groupId) {
+        if (dependencyGroupIds.contains(groupId)) {
+            return true;
+        }
+        for (final PomProjectAnalyzer module : modules) {
+            if (module.containsDependencyWithGroupId(groupId)) {
                 return true;
             }
         }
