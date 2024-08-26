@@ -1,11 +1,14 @@
 package com.microsoft.azure.maven.container.apps;
 
+import com.microsoft.azure.maven.container.apps.implementation.PomProjectAnalyzer;
 import org.apache.maven.archetype.mojos.CreateProjectFromArchetypeMojo;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
+import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.Properties;
 
@@ -13,7 +16,6 @@ import java.util.Properties;
 public class OrchestrateMojo extends CreateProjectFromArchetypeMojo {
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        System.out.println("Orchestrate Mojo started");
         updateSuperFields();
         updateUserProperties();
         super.execute();
@@ -59,8 +61,22 @@ public class OrchestrateMojo extends CreateProjectFromArchetypeMojo {
 
     private void setArchetypeRelatedProperties(Properties properties) {
         properties.setProperty("moduleId", "com.microsoft.azure.container.apps.maven.plugin.generated.app.host");
-        properties.setProperty("includeAzure", "false");
-        properties.setProperty("includeSpring", "true");
+        PomProjectAnalyzer analyzer;
+        try {
+            analyzer = new PomProjectAnalyzer("pom.xml");
+        } catch (IOException| XmlPullParserException e) {
+            throw new RuntimeException(e);
+        }
+        properties.setProperty("includeAzure", String.valueOf(includeAzure(analyzer)));
+        properties.setProperty("includeSpring", String.valueOf(includeSpring(analyzer)));
+    }
+
+    private boolean includeAzure(PomProjectAnalyzer analyzer) {
+        return analyzer.containsDependency("com.azure", "azure-storage-blob");
+    }
+
+    private boolean includeSpring(PomProjectAnalyzer analyzer) {
+        return analyzer.containsDependencyWithGroupId("org.springframework.boot");
     }
 
 }
