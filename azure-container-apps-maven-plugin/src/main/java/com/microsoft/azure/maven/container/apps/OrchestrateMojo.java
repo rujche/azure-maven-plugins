@@ -40,8 +40,8 @@ public class OrchestrateMojo extends CreateProjectFromArchetypeMojo {
         getLog().info("Generating azure.yml.");
         try {
             Files.copy(
-                Objects.requireNonNull(OrchestrateMojo.class.getResourceAsStream("/azure-container-apps-maven-plugin/azure.yml")),
-                new File("./azure.yml").toPath(),
+                Objects.requireNonNull(OrchestrateMojo.class.getResourceAsStream("/azure-container-apps-maven-plugin/azure.yaml")),
+                new File("./azure.yaml").toPath(),
                 StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
             throw new RuntimeException(e);
