@@ -22,7 +22,8 @@ public class OrchestrateMojo extends CreateProjectFromArchetypeMojo {
     public void execute() throws MojoExecutionException, MojoFailureException {
         generateAppHost();
         generateAzureYml();
-        callAzdInit();
+        // executeCommand("azd init"); // Now azd init can not execute successfully
+        executeCommand("azd up");
     }
 
     private void generateAppHost() throws MojoExecutionException, MojoFailureException {
@@ -44,10 +45,10 @@ public class OrchestrateMojo extends CreateProjectFromArchetypeMojo {
         }
     }
 
-    private void callAzdInit() {
-        getLog().info("Calling 'azd-init'.");
+    private void executeCommand(String command) {
+        getLog().info("Executing command: " + command);
         try {
-            Runtime.getRuntime().exec("azd init");
+            Runtime.getRuntime().exec("azd up");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
