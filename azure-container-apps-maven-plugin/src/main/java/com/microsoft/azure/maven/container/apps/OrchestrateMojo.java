@@ -7,17 +7,13 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.Objects;
 import java.util.Properties;
-import java.util.Scanner;
 
 @Mojo(name = "orchestrate")
 public class OrchestrateMojo extends CreateProjectFromArchetypeMojo {
@@ -54,43 +50,6 @@ public class OrchestrateMojo extends CreateProjectFromArchetypeMojo {
             Runtime.getRuntime().exec("azd init");
         } catch (IOException e) {
             throw new RuntimeException(e);
-        }
-    }
-
-    public static void main(String[] args) {
-        try {
-            // 创建 ProcessBuilder 来启动 azd init 命令
-            ProcessBuilder builder = new ProcessBuilder("azd", "init");
-            Process process = builder.start();
-
-            // 获取进程的输入流和输出流
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            OutputStream outputStream = process.getOutputStream();
-
-            // 创建一个新线程来读取进程的输出
-            new Thread(() -> {
-                String line;
-                try {
-                    while ((line = reader.readLine()) != null) {
-                        System.out.println(line);
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }).start();
-
-            // 使用 Scanner 来读取用户输入
-            Scanner scanner = new Scanner(System.in);
-            while (scanner.hasNextLine()) {
-                String input = scanner.nextLine();
-                outputStream.write((input + "\n").getBytes());
-                outputStream.flush();
-            }
-
-            // 等待进程结束
-            process.waitFor();
-        } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
         }
     }
 
