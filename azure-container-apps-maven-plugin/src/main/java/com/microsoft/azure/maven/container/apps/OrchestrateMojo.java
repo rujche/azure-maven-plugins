@@ -33,7 +33,7 @@ public class OrchestrateMojo extends CreateProjectFromArchetypeMojo {
     }
 
     private void generateAzureYml() {
-        getLog().info("Generating azure.yml.");
+        getLog().info("Generating azure.yaml.");
         try {
             Files.copy(
                 Objects.requireNonNull(OrchestrateMojo.class.getResourceAsStream("/azure-container-apps-maven-plugin/azure.yaml")),
