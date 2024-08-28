@@ -7,13 +7,18 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.Scanner;
 
 @Mojo(name = "orchestrate")
 public class OrchestrateMojo extends CreateProjectFromArchetypeMojo {
@@ -22,8 +27,13 @@ public class OrchestrateMojo extends CreateProjectFromArchetypeMojo {
     public void execute() throws MojoExecutionException, MojoFailureException {
         generateAppHost();
         generateAzureYml();
-        // executeCommand("azd init"); // Now azd init can not execute successfully
-        executeCommand("azd up");
+        runAzdInit();
+        runAzdUp();
+    }
+
+    public static void main(String[] args) {
+        OrchestrateMojo mojo = new OrchestrateMojo();
+        mojo.executeCommand("azd", "up");
     }
 
     private void generateAppHost() throws MojoExecutionException, MojoFailureException {
@@ -45,11 +55,45 @@ public class OrchestrateMojo extends CreateProjectFromArchetypeMojo {
         }
     }
 
-    private void executeCommand(String command) {
-        getLog().info("Executing command: " + command);
+    private void runAzdInit() {
+        // executeCommand("azd init"); // Now azd init can not execute successfully
+        Scanner scanner = new Scanner(System.in);
+        System.out.print("Please run 'azd init' in another Terminal. After 'azd init' finished, press enter here.");
+        scanner.nextLine();
+    }
+
+    private void runAzdUp() {
+        executeCommand("azd", "up");
+    }
+
+    private void executeCommand(String... command) {
+        getLog().info("Executing command: " + Arrays.toString(command));
         try {
-            Runtime.getRuntime().exec("azd up");
-        } catch (IOException e) {
+            ProcessBuilder builder = new ProcessBuilder(command);
+            Process process = builder.start();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            OutputStream outputStream = process.getOutputStream();
+
+            new Thread(() -> {
+                String line;
+                try {
+                    while ((line = reader.readLine()) != null) {
+                        System.out.println(line);
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }).start();
+
+            Scanner scanner = new Scanner(System.in);
+            while (scanner.hasNextLine()) {
+                String input = scanner.nextLine();
+                outputStream.write((input + "\n").getBytes());
+                outputStream.flush();
+            }
+
+            process.waitFor();
+        } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
